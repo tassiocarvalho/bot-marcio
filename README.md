@@ -13,36 +13,8 @@
 [![FFMPEG](https://img.shields.io/badge/FFMPEG-Latest-orange?logo=ffmpeg)](https://ffmpeg.org/)
 [![Spider X API](https://img.shields.io/badge/Spider_X-API-green?logo=api)](https://api.spiderx.com.br)
 
-## Desenvolvida do zero, no vídeo
-
-[CRIANDO UM BOT DE WHATSAPP DO ZERO (GUIA DEFINITIVO) - BASE COMPLETA + 6 COMANDOS - JAVASCRIPT](https://youtu.be/6zr2NYIYIyc)
 
 ![Logger](./assets/images/logger.png)
-
-## 📋 Sumário
-
-1. [Idiomas disponíveis](#-acesse-o-takeshi-bot-em-outros-idiomas)
-2. [Atenção - suporte](#-atenção)
-3. [Sobre o projeto](#sobre-este-projeto)
-4. Instalação
-   - [Instalação no Termux](#instalação-no-termux)
-   - [Instalação nas principais hosts do Brasil](#instalação-nas-principais-hosts-do-brasil)
-   - [Instalação em VPS (Debian/Ubuntu)](#instalação-em-vps-debianubuntu)
-5. [Configuração de API](#alguns-comandos-necessitam-de-api)
-6. Funcionalidades
-   - [Funcionalidades gerais](#funcionalidades-gerais)
-   - [Funcionalidades de envio](#funcionalidades-de-envio-exemplos)
-7. [Auto responder](#auto-responder)
-    - [Menu do bot](#onde-fica-o-menu-do-bot)
-    - [Mensagens de boas vindas](#onde-modifico-a-mensagem-de-boas-vindas-e-quando-alguém-sai-do-grupo)
-8. [Implementação técnica](#implementação-técnica-dos-exemplos)
-9. [Estrutura de pastas](#estrutura-de-pastas)
-10. [Erros comuns](#erros-comuns)
-11. [Canal do YouTube](#inscreva-se-no-canal)
-12. [Contribuindo com o projeto](#contribuindo-com-o-projeto)
-13. [Licença](#licença)
-14. [Disclaimer](#-disclaimer)
-
 
 
 ## Instalação no Termux
