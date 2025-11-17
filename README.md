@@ -1,6 +1,6 @@
 # 🤖 Takeshi Bot
 
-![Takeshi Bot](./assets/images/takeshi-bot.png)
+![Marcio Bot](./assets/images/takeshi-bot.png)
 
 [![Version](https://img.shields.io/badge/Vers%C3%A3o-7.0.0-blue)](https://github.com/guiireal/takeshi-bot)
 [![Tests](https://github.com/guiireal/takeshi-bot/actions/workflows/test.yml/badge.svg)](https://github.com/guiireal/takeshi-bot/actions/workflows/test.yml)
@@ -43,30 +43,11 @@
 13. [Licença](#licença)
 14. [Disclaimer](#-disclaimer)
 
-## 🌐 Acesse o Takeshi Bot em outros idiomas
 
-- 🇺🇸 [**English version**](https://github.com/guiireal/takeshi-bot-english)
-- 🇪🇸 [**Versión en Español**](https://github.com/guiireal/takeshi-bot-espanol)
-- 🇮🇩 [**Versi Bahasa Indonesia**](https://github.com/guiireal/takeshi-bot-bahasa-indonesia)
-
-## ⚠ Atenção
-
-Nós não prestamos suporte gratuíto caso você tenha adquirido esta base com terceiros e tenha pago por isso.
-Este bot sempre foi e sempre será **gratuíto**.
-Caso você tenha pago para utilizar este bot, do jeito que ele está hoje, saiba que você **foi enganado**.
-Nós não temos vínculo nenhum com terceiros e não nos responsabilizamos por isso, também não prestamos suporte nessas condições.
-Os únicos recursos pagos deste bot são pertencentes à [https://api.spiderx.com.br](https://api.spiderx.com.br), nossa API oficial.
-
-## Sobre este projeto
-
-Este projeto não possui qualquer vínculo oficial com o WhatsApp. Ele foi desenvolvido de forma independente para interações automatizadas por meio da plataforma.
-
-Não nos responsabilizamos por qualquer uso indevido deste bot. É de responsabilidade exclusiva do usuário garantir que sua utilização esteja em conformidade com os termos de uso do WhatsApp e a legislação vigente.
 
 ## Instalação no Termux
 
 1 - Abra o Termux e execute os comandos abaixo.
-_Não tem o Termux? [Clique aqui e baixe a última versão](https://www.mediafire.com/file/wxpygdb9bcb5npb/Termux_0.118.3_Dev_Gui.apk) ou [clique aqui e baixe versão da Play Store](https://play.google.com/store/apps/details?id=com.termux) caso a versão do MediaFire anterior não funcione._
 
 ```sh
 pkg upgrade -y && pkg update -y && pkg install git -y && pkg install nodejs-lts -y && pkg install ffmpeg -y
@@ -101,7 +82,7 @@ git clone https://github.com/tassiocarvalho/bot-marcio.git
 5 - Entre na pasta que foi clonada.
 
 ```sh
-cd takeshi-bot
+cd bot-marcio
 ```
 
 6 - Habilite permissões de leitura e escrita (faça apenas 1x esse passo).
@@ -118,7 +99,6 @@ npm start
 
 8 - Insira o número de telefone e pressione `enter`.
 
-9 - Informe o código que aparece no termux, no seu WhatsApp, [assista aqui, caso não encontre essa opção](https://youtu.be/6zr2NYIYIyc?t=5395).
 
 10 - Aguarde 10 segundos, depois digite `CTRL + C` para parar o bot.
 
@@ -154,18 +134,6 @@ npm start
 ## Instalação nas principais hosts do Brasil
 
 As principais hosts já oferecem o Takeshi como **bot padrão**, não sendo necessário nenhuma instalação manual!
-
-**Hosts suportadas**:
-
-| Bronxys | Nexfuture | Speed Cloud |
-|---------|-----------|-------------|
-| [Grupo oficial](https://chat.whatsapp.com/J5OewHvweK1Kf7RGXAwIYM) | [Grupo oficial](https://chat.whatsapp.com/Fl5FzZQC00J5CZp07AZVwQ?mode=r_c) | [Grupo oficial](https://chat.whatsapp.com/HsZDn6DJrx34z5lbNbNB2M) |
-| [![Bronxys](./assets/images/bronxys.png)](https://bronxyshost.com/) | [![Nexfuture](./assets/images/nexfuture.png)](https://nexfuture.com.br/) | [![Speed Cloud](./assets/images/speed-cloud.png)](https://speedhosting.cloud/) |
-
-| Bores Host | TED Host |
-|------------|----------|
-| [Grupo oficial](https://chat.whatsapp.com/Ho2Zs63uKWuFwBwUdjV0cU) | [Grupo oficial](https://chat.whatsapp.com/DVDE1TCtHrKFatUKrlepjZ) |
-| [![Bores Host](./assets/images/bores-host.png)](https://loja.botbores.shop/) | [![TED Host](./assets/images/ted-host.png)](https://app.tedzinho.com.br/) |
 
 ## Instalação em VPS (Debian/Ubuntu)
 
@@ -226,13 +194,13 @@ npm install pm2 -g
 10 - Clone o repositório do bot onde você desejar.
 
 ```sh
-git clone https://github.com/guiireal/takeshi-bot.git
+git clone https://github.com/tassiocarvalho/bot-marcio.git
 ```
 
 11 - Entre na pasta clonada.
 
 ```sh
-cd takeshi-bot
+cd bot-marcio
 ```
 
 12 - Digite o seguinte comando.
