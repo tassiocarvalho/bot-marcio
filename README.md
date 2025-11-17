@@ -1,4 +1,4 @@
-# 🤖 Takeshi Bot
+# Tássio BOT - modificado do takeshi-bot
 
 ![Marcio Bot](./assets/images/takeshi-bot.png)
 
