@@ -1,3 +1,8 @@
+import path from "node:path";
+import { ASSETS_DIR, PREFIX } from "../../../config.js";
+import { InvalidParameterError } from "../../../errors/index.js";
+import { onlyNumbers } from "../../../utils/index.js";
+
 const command = {
     name: "listadegados",
     aliases: ["gadolist", "gados"],

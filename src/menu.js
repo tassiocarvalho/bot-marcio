@@ -1,5 +1,5 @@
 /**
- * Menu do bot
+ = Menu do bot
  *
  * @author Dev Gui
  */
@@ -109,7 +109,7 @@ export function menuMessage(groupJid) {
 ▢ • ${prefix}lutar
 ▢ • ${prefix}matar
 ▢ • ${prefix}socar
-▢ • ${prefix}listadegados
+▢ • ${prefix}listadegados <-test
 ▢
 ╰━━─「🎡」─━━
 
