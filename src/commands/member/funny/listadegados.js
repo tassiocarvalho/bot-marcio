@@ -67,7 +67,7 @@ export default {
   handle: async ({ sendMessage, groupMembers, groupId }) => {
 
     if (!groupMembers || !groupMembers.length) {
-      throw new InvalidParameterError("Este comando só pode ser usado em grupos.");
+      throw new InvalidParameterError("Este comando só pode ser usado em grupos. deixa de leseira");
     }
 
     // seleciona apenas usuários válidos
