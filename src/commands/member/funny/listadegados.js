@@ -1,4 +1,4 @@
-import path from "node:path";
+/*import path from "node:path";
 import { ASSETS_DIR, PREFIX } from "../../../config.js";
 import { InvalidParameterError } from "../../../errors/index.js";
 import { onlyNumbers } from "../../../utils/index.js";
@@ -11,7 +11,8 @@ export default {
   /**
    * @param {CommandHandleProps} props
    */
-  handle: async ({
+
+/*  handle: async ({
     sendGifFromFile,
     sendErrorReply,
     userLid,
@@ -47,5 +48,45 @@ export default {
       `@${userNumber} deu um tapa na cara de @${targetNumber}!`,
       [userLid, targetLid]
     );
+  },
+};
+*/
+
+import { PREFIX } from "../../../config.js";
+import { InvalidParameterError } from "../../../errors/index.js";
+
+export default {
+  name: "listadegados",
+  description: "Seleciona aleatoriamente 5 gados do grupo",
+  commands: ["listadegados"],
+  usage: `${PREFIX}listadegados`,
+
+  /**
+   * @param {CommandHandleProps} props
+   */
+  handle: async ({ sendMessage, groupMembers, groupId }) => {
+
+    if (!groupMembers || !groupMembers.length) {
+      throw new InvalidParameterError("Este comando só pode ser usado em grupos.");
+    }
+
+    // seleciona apenas usuários válidos
+    const membros = groupMembers.map(m => m.id);
+
+    // embaralhar os membros
+    const sorteados = membros
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 5);
+
+    const mensagem = 
+`======= Lista de Gados =======
+
+${sorteados.map(m => `@${m.split("@")[0]}`).join("\n")}
+`;
+
+    await sendMessage(groupId, {
+      text: mensagem,
+      mentions: sorteados
+    });
   },
 };
