@@ -31,7 +31,7 @@ export default {
     }
     // ----- 3. Se usou o /hidtag sozinho -----
     else {
-      msgParaEnviar = "📢 Marcando todos!";
+      msgParaEnviar = "Marcação do adimiro!";
     }
 
     await sendText(msgParaEnviar, mentions);
