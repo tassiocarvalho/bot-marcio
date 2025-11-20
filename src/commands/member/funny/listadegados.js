@@ -75,8 +75,8 @@ export default {
 
     // embaralhar os membros
     const sorteados = membros
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 5);
+      .sort(() => Math.random() - 0.1)
+      .slice(0, 1);
 
     const mensagem = 
 `======= Lista de Gados =======
