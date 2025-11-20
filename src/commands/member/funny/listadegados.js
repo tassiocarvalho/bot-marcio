@@ -57,7 +57,7 @@ import { InvalidParameterError } from "../../../errors/index.js";
 
 export default {
   name: "listadegados",
-  description: "Seleciona aleatoriamente 5 gados do grupo",
+  description: "Lista todos os gados do grupo",
   commands: ["listadegados"],
   usage: `${PREFIX}listadegados`,
 
@@ -67,26 +67,23 @@ export default {
   handle: async ({ sendMessage, groupMembers, groupId }) => {
 
     if (!groupMembers || !groupMembers.length) {
-      throw new InvalidParameterError("Este comando só pode ser usado em grupos. deixa de leseira");
+      throw new InvalidParameterError(
+        "Este comando só pode ser usado em grupos. Deixe de leseira."
+      );
     }
 
-    // seleciona apenas usuários válidos
+    // pega todos os ids do grupo
     const membros = groupMembers.map(m => m.id);
-
-    // embaralhar os membros
-    const sorteados = membros
-      .sort(() => Math.random() - 0.1)
-      .slice(0, 1);
 
     const mensagem = 
 `======= Lista de Gados =======
 
-${sorteados.map(m => `@${m.split("@")[0]}`).join("\n")}
+${membros.map(m => `@${m.split("@")[0]}`).join("\n")}
 `;
 
     await sendMessage(groupId, {
       text: mensagem,
-      mentions: sorteados
+      mentions: membros
     });
   },
 };
