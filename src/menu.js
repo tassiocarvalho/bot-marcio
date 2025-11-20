@@ -22,7 +22,7 @@ export function menuMessage(groupJid) {
 ╰━━─「🪐」─━━
 
 ╭━━⪩ DONO ⪨━━
-▢
+▢ ALGUÉM AÍ
 ▢ • ${prefix}exec
 ▢ • ${prefix}get-group-id
 ▢ • ${prefix}off
