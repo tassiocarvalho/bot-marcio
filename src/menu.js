@@ -16,8 +16,6 @@ export function menuMessage(groupJid) {
   return `╭━━⪩ BEM VINDO! ⪨━━${readMore()}
 ▢
 ▢ • ${BOT_NAME}
-▢ • Data: ${date.toLocaleDateString("pt-br")}
-▢ • Hora: ${date.toLocaleTimeString("pt-br")}
 ▢ • Prefixo: ${prefix}
 ▢ • Versão: ${pkg.version}
 ▢
@@ -111,6 +109,7 @@ export function menuMessage(groupJid) {
 ▢ • ${prefix}lutar
 ▢ • ${prefix}matar
 ▢ • ${prefix}socar
+▢ • ${prefix}listadegados
 ▢
 ╰━━─「🎡」─━━
 

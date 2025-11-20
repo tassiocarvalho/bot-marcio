@@ -1,65 +1,46 @@
-// src/commands/member/funny/listadegados.js
-import { getGroupMembers } from '../../utils/loadCommonFunctions.js';
-
 const command = {
     name: "listadegados",
-    description: "Sorteia 5 gados aleatórios do grupo (brincadeira)",
-    aliases: ["gadolist", "gados", "listagado"],
-    cooldown: 15, // 15 segundos de cooldown pra não floodar
-
-    async execute(client, message, args) {
-        const { remoteJid, participant } = message.key;
-        const isGroup = remoteJid.endsWith('@g.us');
-
-        if (!isGroup) {
-            return client.sendMessage(remoteJid, { text: "❌ Esse comando só funciona em grupos!" }, { quoted: message });
+    aliases: ["gadolist", "gados"],
+    execute: async (client, message) => {  // Assumindo params padrão do Takeshi: client, message
+        const remoteJid = message.key.remoteJid;
+        if (!remoteJid.endsWith('@g.us')) {
+            return client.sendMessage(remoteJid, { text: '❌ Só em grupos, brother!' }, { quoted: message });
         }
 
         try {
-            // Pega todos os participantes do grupo
-            const members = await getGroupMembers(remoteJid, client);
-
-            // Remove o próprio bot da lista
-            const realMembers = members.filter(m => !m.id.includes('lid') && m.id !== client.user.id);
-
-            if (realMembers.length < 5) {
-                return client.sendMessage(remoteJid, { 
-                    text: "❌ O grupo precisa ter pelo menos 5 membros (sem contar o bot) pra fazer a lista de gado!" 
-                }, { quoted: message });
+            const groupMeta = await client.groupMetadata(remoteJid);
+            let members = groupMeta.participants;
+            
+            // Filtro simples: remove bot e inválidos
+            members = members.filter(m => m.id !== client.user?.id && m.id.endsWith('@s.whatsapp.net'));
+            
+            if (members.length < 5) {
+                return client.sendMessage(remoteJid, { text: '❌ Grupo precisa de 5+ membros pra zuera!' }, { quoted: message });
             }
-
-            // Embaralha e pega 5 aleatórios
-            const shuffled = realMembers.sort(() => 0.5 - Math.random());
-            const gados = shuffled.slice(0, 5);
-
-            // Monta a lista bonita
-            let texto = "═════ ⋆★⋆ ═════\n";
-            texto += "   🐄 *LISTA DE GADOS* 🐄\n";
-            texto += "═════ ⋆★⋆ ═════\n\n";
-
-            gados.forEach((gado, index) => {
-                const nome = gado.pushName || gado.verifiedName || "Sem Nome";
-                const numero = gado.id.split('@')[0];
-                texto += `${index + 1}º ➤ @${numero}\n`;
-                texto += `    ├ Nome: ${nome}\n`;
-                texto += `    └ Status: *Gado nível máximo* 🐂\n\n`;
+            
+            // Sorteio: embaralha e pega 5
+            for (let i = members.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [members[i], members[j]] = [members[j], members[i]];
+            }
+            const gados = members.slice(0, 5);
+            
+            let text = '═════ ⋆★⋆ ═════\n   🐄 *LISTA DE GADOS* 🐄\n═════ ⋆★⋆ ═════\n\n';
+            const mentions = [];
+            
+            gados.forEach((m, i) => {
+                const nome = m.pushname || m.notify || 'Gado Sem Nome';
+                const num = m.id.split('@')[0];
+                text += `${i+1}º ➤ @${num}\n   ├ ${nome}\n   └ *Gado elite* 🐂\n\n`;
+                mentions.push(m.id);
             });
-
-            texto += "💔 *Chora na moral, gado!* 😭";
-
-            // Menciona os 5 gados sorteados
-            const mentions = gados.map(g => g.id);
-
-            await client.sendMessage(remoteJid, {
-                text: texto,
-                mentions: mentions
-            }, { quoted: message });
-
-        } catch (err) {
-            console.log(err);
-            await client.sendMessage(remoteJid, { 
-                text: "❌ Deu ruim na hora de sortear os gados... tenta de novo!" 
-            }, { quoted: message });
+            
+            text += '💔 Chora gado, deve rodada! 😭';
+            
+            client.sendMessage(remoteJid, { text, mentions }, { quoted: message });
+        } catch (e) {
+            console.log('Erro listadegados:', e);  // Log pro debug
+            client.sendMessage(remoteJid, { text: '❌ Erro no sorteio... Tenta de novo!' }, { quoted: message });
         }
     }
 };
