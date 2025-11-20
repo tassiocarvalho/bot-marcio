@@ -29,7 +29,6 @@ export function menuMessage(groupJid) {
 ▢ • ${prefix}on
 ▢ • ${prefix}set-menu-image
 ▢ • ${prefix}set-prefix
-▢ • ${prefix}set-spider-api-token
 ▢
 ╰━━─「🌌」─━━
 
@@ -90,15 +89,6 @@ export function menuMessage(groupJid) {
 ▢
 ╰━━─「🚀」─━━
 
-╭━━⪩ DOWNLOADS ⪨━━
-▢
-▢ • ${prefix}play-audio
-▢ • ${prefix}play-video
-▢ • ${prefix}tik-tok
-▢ • ${prefix}yt-mp3
-▢ • ${prefix}yt-mp4
-▢
-╰━━─「🎶」─━━
 
 ╭━━⪩ BRINCADEIRAS ⪨━━
 ▢
@@ -109,29 +99,6 @@ export function menuMessage(groupJid) {
 ▢ • ${prefix}lutar
 ▢ • ${prefix}matar
 ▢ • ${prefix}socar
-▢ • ${prefix}listadegados <-test
 ▢
-╰━━─「🎡」─━━
-
-╭━━⪩ IA ⪨━━
-▢
-▢ • ${prefix}flux
-▢ • ${prefix}gemini
-▢ • ${prefix}ia-sticker
-▢
-╰━━─「🚀」─━━
-
-╭━━⪩ CANVAS ⪨━━
-▢
-▢ • ${prefix}blur
-▢ • ${prefix}bolsonaro
-▢ • ${prefix}cadeia
-▢ • ${prefix}contraste
-▢ • ${prefix}espelhar
-▢ • ${prefix}gray
-▢ • ${prefix}inverter
-▢ • ${prefix}pixel
-▢ • ${prefix}rip
-▢
-╰━━─「❇」─━━`;
+╰━━─「🎡」─━━`;
 };
