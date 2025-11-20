@@ -1,63 +1,39 @@
 import { PREFIX } from "../../config.js";
 
 export default {
-  name: "hidetag",
-  description: "Marca todos do grupo",
-  commands: ["hidetag", "hide-tag", "to-tag"],
-  usage: `${PREFIX}hidetag`,
+  name: "hide-tag",
+  description: "Este comando marcará todos do grupo",
+  commands: ["hide-tag", "to-tag", "hidtag"],
+  usage: `${PREFIX}hidtag motivo`,
 
-  handle: async ({ fullArgs, sendText, sendReact, socket, remoteJid, quoted }) => {
+  /**
+   * @param {CommandHandleProps} props
+   */
+  handle: async ({ fullArgs, sendText, socket, remoteJid, sendReact, quoted, type }) => {
     const { participants } = await socket.groupMetadata(remoteJid);
     const mentions = participants.map(({ id }) => id);
-
     await sendReact("📢");
 
-    let mensagemFinal = "";
+    let msgParaEnviar = "";
 
-    // ============================
-    // 1) CAPTURAR TEXTO RESPONDIDO
-    // ============================
+    // ----- 1. Se respondeu uma mensagem -----
     if (quoted) {
-      let txt = null;
-
-      const msg = quoted.msg;
-
-      if (!msg) {
+      // Se a mensagem respondida for texto
+      if (quoted.msg && quoted.msg.conversation) {
+        msgParaEnviar = quoted.msg.conversation;
+      } else {
         return await sendText("❗ Marque uma mensagem **de texto**!", mentions);
       }
-
-      // Tenta pegar texto de diferentes tipos
-      txt =
-        msg.conversation ||
-        msg.extendedTextMessage?.text ||
-        msg.imageMessage?.caption ||
-        msg.videoMessage?.caption ||
-        msg.buttonsResponseMessage?.selectedButtonId ||
-        msg.listResponseMessage?.singleSelectReply?.selectedRowId ||
-        null;
-
-      if (!txt) {
-        return await sendText("❗ Marque uma mensagem **de texto**!", mentions);
-      }
-
-      mensagemFinal = txt;
     }
-
-    // ============================
-    // 2) /hidtag + texto
-    // ============================
+    // ----- 2. Se escreveu algo após o comando -----
     else if (fullArgs.trim().length > 0) {
-      mensagemFinal = fullArgs.trim();
+      msgParaEnviar = fullArgs.trim();
     }
-
-    // ============================
-    // 3) /hidtag sozinho
-    // ============================
+    // ----- 3. Se usou o /hidtag sozinho -----
     else {
-      mensagemFinal = "📢 Marcando todos!";
+      msgParaEnviar = "📢 Marcando todos!";
     }
 
-    // Envia mensagem final marcando todos
-    await sendText(mensagemFinal, mentions);
+    await sendText(msgParaEnviar, mentions);
   },
 };
