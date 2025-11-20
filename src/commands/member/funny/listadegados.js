@@ -53,27 +53,22 @@ export default {
 */
 
 import { PREFIX } from "../../../config.js";
-import { InvalidParameterError } from "../../../errors/index.js";
 
 export default {
   name: "listadegados",
-  description: "Lista todos os gados do grupo",
+  description: "Lista todos os gados do grupo.",
   commands: ["listadegados"],
   usage: `${PREFIX}listadegados`,
 
   /**
    * @param {CommandHandleProps} props
    */
-  handle: async ({ sendMessage, groupMembers, groupId }) => {
-
-    if (!groupMembers || !groupMembers.length) {
-      throw new InvalidParameterError(
-        "Este comando só pode ser usado em grupos. Deixe de leseira."
-      );
+  handle: async ({ sendGifFromFile, participants }) => {
+    if (!participants || !participants.length) {
+      throw new InvalidParameterError("Este comando só pode ser usado em grupos.");
     }
 
-    // pega todos os ids do grupo
-    const membros = groupMembers.map(m => m.id);
+    const membros = participants.map(m => m.id);
 
     const mensagem = 
 `======= Lista de Gados =======
@@ -81,9 +76,10 @@ export default {
 ${membros.map(m => `@${m.split("@")[0]}`).join("\n")}
 `;
 
-    await sendMessage(groupId, {
-      text: mensagem,
-      mentions: membros
-    });
+    await sendGifFromFile(
+      null, // sem gif
+      mensagem,
+      membros
+    );
   },
 };
