@@ -77,7 +77,7 @@ ${membros.map(m => `@${m.split("@")[0]}`).join("\n")}
 `;
 
     await sendGifFromFile(
-      null, // sem gif
+      null,
       mensagem,
       membros
     );
