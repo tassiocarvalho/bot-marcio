@@ -49,26 +49,3 @@ export default {
     );
   },
 };
-
-if (command === "listadegados") {
-    if (!isGroup) return reply("❌ Esse comando só funciona em grupos.");
-
-    const participantes = groupMetadata.participants.map(p => p.id);
-
-    if (participantes.length < 5)
-        return reply("O grupo não tem membros suficientes para montar a lista.");
-
-    // embaralha os membros
-    const embaralhados = participantes.sort(() => Math.random() - 0.5);
-
-    // seleciona os 5 primeiros
-    const selecionados = embaralhados.slice(0, 5);
-
-    let texto = "======= Lista de Gados =======\n\n";
-    texto += selecionados.map(u => `@${u.split("@")[0]}`).join("\n");
-
-    conn.sendMessage(from, {
-        text: texto,
-        mentions: selecionados
-    });
-}
