@@ -1,43 +1,29 @@
 import { PREFIX } from "../../../config.js";
-import { InvalidParameterError } from "../../../errors/index.js";
-import { onlyNumbers } from "../../../utils/index.js";
 
 export default {
   name: "lid",
-  description: "Mostra o LID (identificador) de um usuário no grupo.",
-  commands: ["lid"],
-  usage: `${PREFIX}lid @usuario ou respondendo a mensagem`,
-  
-  handle: async ({ sendTextMessage, sendErrorReply, replyLid, args, isReply, remoteJid }) => {
-    if (!args.length && !isReply) {
-      throw new InvalidParameterError(
-        "Você precisa mencionar ou responder a mensagem de alguém para ver o LID!"
-      );
-    }
+  description: "Retorna o JID (LID) do usuário que executou o comando.",
+  commands: ["lid", "jid"],
+  usage: `${PREFIX}lid`,
 
-    const targetLid = isReply ? replyLid : args[0] ? `${onlyNumbers(args[0])}@lid` : null;
+  /**
+   * @param {CommandHandleProps} props
+   */
+  handle: async ({ sendReply, userLid, replyLid, isReply, mentionedLid }) => {
+    // 1. Identificar o alvo (LID)
+    // Prioridade: 1. Menção na mensagem, 2. Resposta, 3. Usuário que executou o comando
+    const targetLid = mentionedLid
+      ? mentionedLid
+      : isReply
+      ? replyLid
+      : userLid;
 
-    if (!targetLid) {
-      await sendErrorReply(
-        "Não foi possível identificar o usuário. Mencione ou responda a mensagem de alguém."
-      );
-      return;
-    }
+    const targetDescription = mentionedLid
+      ? "O JID (LID) do usuário mencionado é:"
+      : isReply
+      ? "O JID (LID) do usuário respondido é:"
+      : "Seu JID (LID) é:";
 
-    const cleanLid = onlyNumbers(targetLid);
-    const lidType = targetLid.includes("@s.whatsapp.net") ? "Número Direto" : "LID de Grupo";
-    const displayNumber = `@${cleanLid}`;
-
-    const messageText = `
-*📱 Informações do Usuário*
-
-*Tipo:* ${lidType}
-*Identificador:* \`${cleanLid}\`
-*LID Completo:* \`${targetLid}\`
-
-${lidType === "LID de Grupo" ? "⚠️ Este é um LID de grupo, não o número real do usuário." : "✅ Este é o número real do usuário."}
-`;
-
-    await sendTextMessage(messageText, [targetLid]);
+    await sendReply(`${targetDescription} \n\n\`\`\`${targetLid}\`\`\``);
   },
 };
