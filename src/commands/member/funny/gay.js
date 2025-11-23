@@ -9,7 +9,7 @@ const GAY_RANGES = [
     min: 0,
     max: 0,
     message: "É 100% hetero! 🚫",
-    gif: "sung-jin-woo-jinwoo.mp4", // Imagem 1: Hetero
+    gif: "hetero.mp4", // Imagem 1: Hetero
   },
   {
     min: 1,
