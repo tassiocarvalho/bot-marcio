@@ -1,43 +1,17 @@
 import { PREFIX } from "../../../config.js";
 import { InvalidParameterError, WarningError } from "../../../errors/index.js";
-import { Innertube } from "youtubei.js";
-import { Writable } from "node:stream";
+import { SpiderXApi } from "../../../services/spider-x-api.js";
+import { Ffmpeg } from "../../../services/ffmpeg.js";
+import ytdl from "ytdl-core";
 import { createWriteStream } from "node:fs";
-import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { TEMP_DIR } from "../../../config.js";
-import { Ffmpeg } from "../../../services/ffmpeg.js";
-import fs from "node:fs";
-
-// Função auxiliar para ler cookies
-function getYoutubeCookies() {
-  const cookiesPath = path.resolve(process.cwd(), "database", "youtube_cookies.json");
-  if (fs.existsSync(cookiesPath)) {
-    try {
-      // Lê o conteúdo como texto puro, remove espaços em branco e quebras de linha
-      let cookies = fs.readFileSync(cookiesPath, "utf-8").trim();
-      
-      // CORREÇÃO: Remove as aspas externas se o formato for JSON String
-      if (cookies.startsWith('"') && cookies.endsWith('"')) {
-          cookies = cookies.substring(1, cookies.length - 1);
-      }
-      
-      // Verifica se o arquivo não está vazio
-      if (cookies.length > 0) {
-        return cookies;
-      }
-    } catch (e) {
-      console.error("Erro ao ler youtube_cookies.json:", e);
-      return null;
-    }
-  }
-  return null;
-}
+import { unlink } from "node:fs/promises";
 
 export default {
   name: "play",
   description: "Pesquisa e envia o áudio de um vídeo do YouTube",
-  commands: ["play"],
+  commands: ["play", "pa"],
   usage: `${PREFIX}play galinha pintadinha`,
   /**
    * @param {CommandHandleProps} props
@@ -58,59 +32,43 @@ export default {
 
     await sendWaitReact();
 
-    let innertube;
-    try {
-      const cookieString = getYoutubeCookies();
-      const options = cookieString ? { cookie: cookieString } : {};
-      
-      innertube = await Innertube.create(options);
-    } catch (error) {
-      console.error("Erro ao criar Innertube:", error);
-      throw new WarningError("Não foi possível conectar ao YouTube. Tente novamente mais tarde.");
-    }
+    const spiderXApi = new SpiderXApi();
+    const ffmpeg = new Ffmpeg();
+    let tempWebmPath = null;
+    let finalMp3Path = null;
 
-    let video;
-    let searchResults; // CORRIGIDO: Declarado aqui para escopo correto
     try {
-      searchResults = await innertube.search(fullArgs, {
-        type: "video",
-      });
+      // 1. Busca o vídeo usando a Spider X API (para evitar bloqueio de IP)
+      const searchResults = await spiderXApi.youtubeSearch(fullArgs);
 
-      if (!searchResults || !searchResults.videos || !searchResults.videos.length) {
+      if (!searchResults.length) {
         throw new WarningError("Nenhum vídeo encontrado para sua pesquisa.");
       }
 
-      video = searchResults.videos[0];
-    } catch (error) {
-      console.error("Erro ao buscar vídeo:", error);
-      // Exibir o erro exato da busca
-      throw new WarningError(`Ocorreu um erro ao buscar o vídeo no YouTube. Detalhes: ${error.message}`);
-    }
+      const firstVideo = searchResults[0];
+      const videoUrl = firstVideo.url;
+      const videoId = firstVideo.url.split("v=")[1];
 
-    const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
-    const tempWebmPath = path.join(TEMP_DIR, `${video.id}_temp.webm` );
-    let finalMp3Path = null;
-    const ffmpeg = new Ffmpeg();
-
-    const infoMessage = `
+      // 2. Exibir as informações do vídeo antes de baixar
+      const infoMessage = `
 *Vídeo Encontrado:*
 
-*Título:* ${video.title}
-*Canal:* ${video.author.name}
-*Duração:* ${video.duration?.text || 'N/A'}
-*Views:* ${video.views?.text || 'N/A'}
+*Título:* ${firstVideo.title}
+*Canal:* ${firstVideo.author}
+*Duração:* ${firstVideo.duration}
+*Views:* ${firstVideo.views}
 *Link:* ${videoUrl}
 
 *Iniciando download e conversão para MP3...*
 `;
+      await sendReply(infoMessage);
 
-    await sendReply(infoMessage);
+      // 3. Baixar o áudio usando ytdl-core (mais simples e sem cookies)
+      tempWebmPath = path.join(TEMP_DIR, `${videoId}_temp.webm`);
 
-    try {
-      // 1. Baixar o stream de áudio para um arquivo temporário (webm/m4a)
-      const stream = await innertube.download(video.id, {
-        type: "audio",
-        quality: "best",
+      const stream = ytdl(videoUrl, {
+        quality: 'highestaudio',
+        filter: 'audioonly'
       });
 
       const fileStream = createWriteStream(tempWebmPath);
@@ -122,23 +80,33 @@ export default {
         fileStream.on("error", reject);
       });
 
-      // 2. Converter o arquivo temporário para MP3 usando FFmpeg
+      // 4. Converter o arquivo temporário para MP3 usando FFmpeg
       finalMp3Path = await ffmpeg.convertToMp3(tempWebmPath);
 
-      // 3. Enviar o MP3 final
+      // 5. Enviar o MP3 final
       await sendAudioFromFile(finalMp3Path, true, true);
       await sendSuccessReact();
     } catch (error) {
-      console.error("Erro ao baixar/converter/enviar áudio:", error);
-      // Propaga o erro exato do FFmpeg ou da operação de download
-      throw new WarningError(`Ocorreu um erro ao baixar, converter ou enviar o áudio. Detalhes: ${error.message}`);
+      console.error("Erro no comando /play (ytdl-core + FFmpeg):", error);
+      
+      let errorMessage = "Ocorreu um erro ao processar sua solicitação de áudio.";
+      
+      if (error.message.includes("FFmpeg not found") || error.message.includes("FFmpeg failed")) {
+          errorMessage = `❌ Erro de Conversão: ${error.message}. Verifique se o FFmpeg está instalado corretamente.`;
+      } else if (error.message.includes("status code 403") || error.message.includes("status code 410")) {
+          errorMessage = `❌ Erro de Download: O vídeo está bloqueado, privado ou indisponível.`;
+      } else if (error instanceof WarningError) {
+          throw error; // Propaga erros amigáveis da Spider X API
+      } else {
+          errorMessage = `❌ Erro Desconhecido: ${error.message}`;
+      }
+      
+      throw new WarningError(errorMessage);
     } finally {
-      // 4. Limpar arquivos temporários
+      // 6. Limpar arquivos temporários
       try {
-        await ffmpeg.cleanup(tempWebmPath);
-        if (finalMp3Path) {
-          await ffmpeg.cleanup(finalMp3Path);
-        }
+        if (tempWebmPath) await unlink(tempWebmPath);
+        if (finalMp3Path) await unlink(finalMp3Path);
       } catch (e) {
         console.error("Erro ao deletar arquivos temporários:", e);
       }
