@@ -106,7 +106,7 @@ ${gadosLids
 `;
 
     // 4. Enviar a mensagem com as menções usando sendGifFromFile para forçar o processamento correto das menções
-    const gifPath = path.resolve(ASSETS_DIR, "images", "gado.png"); // Usando um GIF genérico
+    const gifPath = path.resolve(ASSETS_DIR, "images", "gado.mp4"); // Usando um GIF genérico
 
     await sendGifFromFile(
       gifPath,
