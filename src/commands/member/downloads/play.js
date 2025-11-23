@@ -8,7 +8,7 @@ import path from "node:path";
 import { TEMP_DIR } from "../../../config.js";
 
 export default {
-  name: "play",
+  name: "play", // Corrigido de "play-new" para "play"
   description: "Pesquisa e envia o áudio de um vídeo do YouTube",
   commands: ["play"],
   usage: `${PREFIX}play galinha pintadinha`,
@@ -63,8 +63,8 @@ export default {
 
 *Título:* ${video.title}
 *Canal:* ${video.author.name}
-*Duração:* ${video.duration.text}
-*Views:* ${video.views.text}
+*Duração:* ${video.duration?.text || 'N/A'}
+*Views:* ${video.views?.text || 'N/A'}
 *Link:* ${videoUrl}
 
 *Iniciando download e conversão para MP3...*
