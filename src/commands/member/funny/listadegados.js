@@ -69,7 +69,7 @@ function getRandomElements(array, n) {
 
 export default {
   name: "listadegados",
-  description: "BOSTA!!.",
+  description: "Seleciona 5 membros aleatórios do grupo e os lista como 'gados'.",
   commands: ["listadegados"],
   usage: `${PREFIX}listadegados`,
 
@@ -97,7 +97,7 @@ export default {
 *======= Lista de Gados =======*
 
 ${gadosLids
-  .map((lid, index) => `${index + 1}. @${onlyNumbers(lid)}`)
+  .map((lid, index) => `${index + 1}. @${lid.split('@')[0]}`)
   .join("\n")}
 
 ==============================
