@@ -93,6 +93,7 @@ export function menuMessage(groupJid) {
 ╭━━⪩ BRINCADEIRAS ⪨━━
 ▢
 ▢ • ${prefix}gay
+▢ • ${prefix}gostoso
 ▢ • ${prefix}abracar
 ▢ • ${prefix}beijar
 ▢ • ${prefix}dado
