@@ -20,12 +20,12 @@ class Ffmpeg {
       exec(command, (error, stdout, stderr) => {
         if (error) {
           if (error.code === 127) {
-            // Código de erro 127 geralmente significa "command not found"
             errorLog("FFmpeg não encontrado. Certifique-se de que está instalado e no PATH.");
             return reject(new Error("FFmpeg não está instalado ou acessível."));
           }
-          errorLog(`Command error: ${stderr}`);
-          return reject(error);
+          // Loga o erro exato do FFmpeg para debug
+          errorLog(`FFmpeg Execution Error: ${stderr}`);
+          return reject(new Error(`FFmpeg failed: ${stderr}`));
         }
         resolve(stdout);
       });
@@ -76,13 +76,14 @@ class Ffmpeg {
 
   /**
    * Converte um arquivo de áudio para MP3.
+   * Usa o codec aac e bitrate fixo para maior compatibilidade.
    * @param {string} inputPath Caminho do arquivo de entrada (ex: .webm, .m4a)
    * @returns {Promise<string>} Caminho do arquivo MP3 de saída
    */
   async convertToMp3(inputPath) {
     const outputPath = await this._createTempFilePath("mp3");
-    // Comando mais simples e robusto para conversão de áudio para MP3
-    const command = `ffmpeg -i ${inputPath} -vn -acodec libmp3lame -q:a 0 ${outputPath}`;
+    // Comando mais universal: -acodec aac é mais comum que libmp3lame
+    const command = `ffmpeg -i ${inputPath} -vn -acodec aac -b:a 192k ${outputPath}`;
     await this._executeCommand(command);
     return outputPath;
   }

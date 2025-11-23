@@ -99,7 +99,8 @@ export default {
       await sendSuccessReact();
     } catch (error) {
       console.error("Erro ao baixar/converter/enviar áudio:", error);
-      throw new WarningError("Ocorreu um erro ao baixar, converter ou enviar o áudio. Verifique se o FFmpeg está instalado corretamente no seu ambiente.");
+      // Propaga o erro exato do FFmpeg ou da operação de download
+      throw new WarningError(`Ocorreu um erro ao baixar, converter ou enviar o áudio. Detalhes: ${error.message}`);
     } finally {
       // 4. Limpar arquivos temporários
       try {
