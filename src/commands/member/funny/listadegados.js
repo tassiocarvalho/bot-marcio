@@ -81,7 +81,7 @@ export default {
   handle: async ({ sendGifFromFile, socket, remoteJid }) => {
     const { participants } = await socket.groupMetadata(remoteJid);
 
-    if (!participants || participants.length < 2) {
+    if (!participants || participants.length < 5) {
       throw new InvalidParameterError(
         "Este comando só pode ser usado em grupos com pelo menos 5 membros."
       );
@@ -89,24 +89,24 @@ export default {
 
     // 1. Selecionar 5 membros aleatórios
     // A lista de participantes do groupMetadata já vem no formato correto { id: '...', admin: '...' }
-    const gadosSelecionados = getRandomElements(participants, 2);
+    const gadosSelecionados = getRandomElements(participants, 5);
 
     // 2. Mapear os LIDs dos membros para a lista de menções
     const gadosLids = gadosSelecionados.map((m) => m.id);
 
     // 3. Criar a mensagem formatada
     const mensagem = `
-*======= Lista de Gados =======*
+*Lista dos Membros mais Gados*
 
 ${gadosLids
   .map((lid, index) => `${index + 1}. @${lid.split('@')[0]}`)
   .join("\n")}
 
-==============================
+============================
 `;
 
     // 4. Enviar a mensagem com as menções usando sendGifFromFile para forçar o processamento correto das menções
-    const gifPath = path.resolve(ASSETS_DIR, "images", "funny", "gintama-gintoki.mp4"); // Usando um GIF genérico
+    const gifPath = path.resolve(ASSETS_DIR, "images", "gado"); // Usando um GIF genérico
 
     await sendGifFromFile(
       gifPath,
