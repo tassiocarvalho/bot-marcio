@@ -90,6 +90,14 @@ export default {
       return;
     }
 
+    const variations = getAllNumberVariations(targetLid);
+    
+    await sendErrorReply(`
+DEBUG INFO:
+targetLid original: ${targetLid}
+Variações geradas: ${variations.join(", ")}
+    `);
+    
     const percentage = calculateGayPercentage(targetLid);
     const range = GAY_RANGES.find(r => percentage >= r.min && percentage <= r.max);
     const displayNumber = getDisplayNumber(targetLid);
