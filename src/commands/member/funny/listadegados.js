@@ -53,33 +53,57 @@ export default {
 */
 
 import { PREFIX } from "../../../config.js";
+import { InvalidParameterError } from "../../../errors/index.js";
+import { onlyNumbers } from "../../../utils/index.js";
+
+/**
+ * Função para selecionar N elementos aleatórios de um array.
+ * @param {Array} array
+ * @param {number} n
+ * @returns {Array}
+ */
+function getRandomElements(array, n) {
+  // Embaralha o array e pega os primeiros N elementos
+  const shuffled = array.sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, n);
+}
 
 export default {
   name: "listadegados",
-  description: "Lista todos os gados do grupo.",
+  description: "Seleciona 5 membros aleatórios do grupo e os lista como 'gados'.",
   commands: ["listadegados"],
   usage: `${PREFIX}listadegados`,
 
   /**
    * @param {CommandHandleProps} props
    */
-  handle: async ({ sendGifFromFile, participants }) => {
-    if (!participants || !participants.length) {
-      throw new InvalidParameterError("Este comando só pode ser usado em grupos.");
+  handle: async ({ sendReply, participants }) => {
+    // Verifica se há participantes suficientes no grupo
+    if (!participants || participants.length < 5) {
+      throw new InvalidParameterError(
+        "Este comando só pode ser usado em grupos com pelo menos 5 membros."
+      );
     }
 
-    const membros = participants.map(m => m.id);
+    // 1. Selecionar 5 membros aleatórios
+    const gadosSelecionados = getRandomElements(participants, 5);
 
-    const mensagem = 
-`======= Lista de Gados =======
+    // 2. Mapear os LIDs dos membros para a lista de menções
+    const gadosLids = gadosSelecionados.map((m) => m.id);
 
-${membros.map(m => `@${m.split("@")[0]}`).join("\n")}
+    // 3. Criar a mensagem formatada
+    const mensagem = `
+*======= Lista de Gados =======*
+
+${gadosLids
+  .map((lid, index) => `${index + 1}. @${onlyNumbers(lid)}`)
+  .join("\n")}
+
+==============================
 `;
 
-    await sendGifFromFile(
-      null,
-      mensagem,
-      membros
-    );
+    // 4. Enviar a mensagem com as menções
+    // O objeto { mentions: gadosLids } garante que o WhatsApp renderize as menções corretamente.
+    await sendReply(mensagem, { mentions: gadosLids });
   },
 };
