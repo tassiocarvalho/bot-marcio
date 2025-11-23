@@ -6,9 +6,10 @@ import { createWriteStream } from "node:fs";
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { TEMP_DIR } from "../../../config.js";
+import { Ffmpeg } from "../../../services/ffmpeg.js"; // Importar Ffmpeg
 
 export default {
-  name: "play", // Corrigido de "play-new" para "play"
+  name: "play",
   description: "Pesquisa e envia o áudio de um vídeo do YouTube",
   commands: ["play"],
   usage: `${PREFIX}play galinha pintadinha`,
@@ -56,7 +57,9 @@ export default {
     }
 
     const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
-    const audioPath = path.join(TEMP_DIR, `${video.id}.mp3` );
+    const tempWebmPath = path.join(TEMP_DIR, `${video.id}_temp.webm` ); // Usando .webm como extensão temporária
+    let finalMp3Path = null;
+    const ffmpeg = new Ffmpeg();
 
     const infoMessage = `
 *Vídeo Encontrado:*
@@ -73,18 +76,13 @@ export default {
     await sendReply(infoMessage);
 
     try {
+      // 1. Baixar o stream de áudio para um arquivo temporário (webm/m4a)
       const stream = await innertube.download(video.id, {
         type: "audio",
         quality: "best",
       });
 
-      const writable = new Writable({
-        write(chunk, encoding, callback) {
-          fileStream.write(chunk, callback);
-        },
-      });
-
-      const fileStream = createWriteStream(audioPath);
+      const fileStream = createWriteStream(tempWebmPath);
 
       await new Promise((resolve, reject) => {
         stream.pipe(fileStream);
@@ -93,16 +91,24 @@ export default {
         fileStream.on("error", reject);
       });
 
-      await sendAudioFromFile(audioPath, true, true);
+      // 2. Converter o arquivo temporário para MP3 usando FFmpeg
+      finalMp3Path = await ffmpeg.convertToMp3(tempWebmPath);
+
+      // 3. Enviar o MP3 final
+      await sendAudioFromFile(finalMp3Path, true, true);
       await sendSuccessReact();
     } catch (error) {
-      console.error("Erro ao baixar/enviar áudio:", error);
-      await sendErrorReply("Ocorreu um erro ao baixar ou enviar o áudio.");
+      console.error("Erro ao baixar/converter/enviar áudio:", error);
+      throw new WarningError("Ocorreu um erro ao baixar, converter ou enviar o áudio. Verifique se o FFmpeg está instalado corretamente no seu ambiente.");
     } finally {
+      // 4. Limpar arquivos temporários
       try {
-        await unlink(audioPath);
+        await ffmpeg.cleanup(tempWebmPath);
+        if (finalMp3Path) {
+          await ffmpeg.cleanup(finalMp3Path);
+        }
       } catch (e) {
-        console.error("Erro ao deletar arquivo temporário:", e);
+        console.error("Erro ao deletar arquivos temporários:", e);
       }
     }
   },

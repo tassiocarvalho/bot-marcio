@@ -1,5 +1,5 @@
 /**
- * Serviços de processamento de imagens usando ffmpeg.
+ * Serviços de processamento de imagens e áudio usando ffmpeg.
  *
  * @author MRX
  */
@@ -69,6 +69,19 @@ class Ffmpeg {
     return outputPath;
   }
 
+  /**
+   * Converte um arquivo de áudio para MP3.
+   * @param {string} inputPath Caminho do arquivo de entrada (ex: .webm, .m4a)
+   * @returns {Promise<string>} Caminho do arquivo MP3 de saída
+   */
+  async convertToMp3(inputPath) {
+    const outputPath = await this._createTempFilePath("mp3");
+    // -vn: remove vídeo, -acodec libmp3lame: usa codec mp3, -q:a 0: qualidade máxima
+    const command = `ffmpeg -i ${inputPath} -vn -acodec libmp3lame -q:a 0 ${outputPath}`;
+    await this._executeCommand(command);
+    return outputPath;
+  }
+
   async cleanup(filePath) {
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
@@ -77,4 +90,3 @@ class Ffmpeg {
 }
 
 export { Ffmpeg };
-
