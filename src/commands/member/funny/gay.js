@@ -14,6 +14,10 @@ const SPECIAL_NUMBERS = {
   "54996630919": 100,
 };
 
+const LID_TO_PHONE_MAP = {
+  "256719003369709": "557583258635",
+};
+
 const GAY_RANGES = [
   { min: 0, max: 0, message: "É 100% hetero! 🚫", gif: "hetero.mp4" },
   { min: 1, max: 25, message: "É quase hetero. Ainda há esperança! 🤏", gif: "gay_1.mp4" },
@@ -23,18 +27,27 @@ const GAY_RANGES = [
   { min: 100, max: 100, message: "É o gay mais gay da terra! 👑", gif: "gay_5.mp4" },
 ];
 
-function getAllNumberVariations(lid) {
-  let number = onlyNumbers(lid);
-  const variations = new Set();
+function getRealPhoneNumber(lid) {
+  const cleanLid = onlyNumbers(lid);
   
-  variations.add(number);
-  
-  if (!number.startsWith("55") && (number.length === 10 || number.length === 11)) {
-    variations.add("55" + number);
+  if (cleanLid in LID_TO_PHONE_MAP) {
+    return LID_TO_PHONE_MAP[cleanLid];
   }
   
-  if (number.startsWith("55") && number.length >= 12) {
-    variations.add(number.substring(2));
+  return cleanLid;
+}
+
+function getAllNumberVariations(phoneNumber) {
+  const variations = new Set();
+  
+  variations.add(phoneNumber);
+  
+  if (!phoneNumber.startsWith("55") && (phoneNumber.length === 10 || phoneNumber.length === 11)) {
+    variations.add("55" + phoneNumber);
+  }
+  
+  if (phoneNumber.startsWith("55") && phoneNumber.length >= 12) {
+    variations.add(phoneNumber.substring(2));
   }
   
   const allVariations = Array.from(variations);
@@ -51,7 +64,8 @@ function getAllNumberVariations(lid) {
 }
 
 function calculateGayPercentage(lid) {
-  const variations = getAllNumberVariations(lid);
+  const realPhone = getRealPhoneNumber(lid);
+  const variations = getAllNumberVariations(realPhone);
   
   for (const variant of variations) {
     if (variant in SPECIAL_NUMBERS) {
@@ -63,7 +77,8 @@ function calculateGayPercentage(lid) {
 }
 
 function getDisplayNumber(lid) {
-  const variations = getAllNumberVariations(lid);
+  const realPhone = getRealPhoneNumber(lid);
+  const variations = getAllNumberVariations(realPhone);
   const withDDI = variations.find(v => v.startsWith("55") && v.length >= 12);
   return withDDI || variations[0];
 }
@@ -90,14 +105,6 @@ export default {
       return;
     }
 
-    const variations = getAllNumberVariations(targetLid);
-    
-    await sendErrorReply(`
-DEBUG INFO:
-targetLid original: ${targetLid}
-Variações geradas: ${variations.join(", ")}
-    `);
-    
     const percentage = calculateGayPercentage(targetLid);
     const range = GAY_RANGES.find(r => percentage >= r.min && percentage <= r.max);
     const displayNumber = getDisplayNumber(targetLid);
