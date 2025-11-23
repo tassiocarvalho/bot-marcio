@@ -105,11 +105,11 @@ ${gadosLids
 ============================
 `;
 
-    // 4. Enviar a mensagem com as menções usando sendGifFromFile para forçar o processamento correto das menções
-    const gifPath = path.resolve(ASSETS_DIR, "images", "gado.png"); // Usando um GIF genérico
+    // 4. Enviar a imagem PNG com as menções
+    const imagePath = path.resolve(ASSETS_DIR, "images", "gado.png");
 
-    await sendGifFromFile(
-      gifPath,
+    await sendImageFromFile(
+      imagePath,
       mensagem,
       gadosLids
     );
