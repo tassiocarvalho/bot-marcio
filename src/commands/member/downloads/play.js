@@ -1,39 +1,47 @@
 import { PREFIX } from "../../../config.js";
 import { InvalidParameterError, WarningError } from "../../../errors/index.js";
 import { Innertube } from "youtubei.js";
-import { exec } from "child_process";
-import { promisify } from "util";
+import ytdl from "ytdl-core";
+import { createWriteStream } from "node:fs";
 import path from "node:path";
 import { TEMP_DIR } from "../../../config.js";
 import { Ffmpeg } from "../../../services/ffmpeg.js";
 import fs from "node:fs";
 
-const execPromise = promisify(exec);
-
-// Função para baixar áudio usando yt-dlp como fallback
-async function downloadWithYtDlp(videoId, outputPath) {
+// Função para baixar com ytdl-core (100% JavaScript)
+async function downloadWithYtdlCore(videoId, outputPath) {
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
   
-  // Comando yt-dlp otimizado para áudio
-  const command = `yt-dlp -f "bestaudio" --extract-audio --audio-format mp3 --audio-quality 192K -o "${outputPath}" "${videoUrl}"`;
-  
-  try {
-    await execPromise(command, { maxBuffer: 1024 * 1024 * 50 }); // 50MB buffer
-    return true;
-  } catch (error) {
-    console.error("Erro no yt-dlp:", error);
-    return false;
-  }
-}
+  return new Promise((resolve, reject) => {
+    try {
+      const stream = ytdl(videoUrl, {
+        quality: 'highestaudio',
+        filter: 'audioonly'
+      });
 
-// Verifica se yt-dlp está instalado
-async function isYtDlpInstalled() {
-  try {
-    await execPromise("yt-dlp --version");
-    return true;
-  } catch {
-    return false;
-  }
+      const fileStream = createWriteStream(outputPath);
+
+      stream.pipe(fileStream);
+
+      stream.on('error', (err) => {
+        console.error('Erro no ytdl stream:', err);
+        reject(err);
+      });
+
+      fileStream.on('finish', () => {
+        console.log('Download ytdl-core concluído');
+        resolve(true);
+      });
+
+      fileStream.on('error', (err) => {
+        console.error('Erro ao escrever arquivo:', err);
+        reject(err);
+      });
+
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 
 export default {
@@ -58,9 +66,6 @@ export default {
 
     await sendWaitReact();
 
-    // Verificar se yt-dlp está disponível
-    const hasYtDlp = await isYtDlpInstalled();
-    
     let innertube;
     try {
       innertube = await Innertube.create({});
@@ -89,8 +94,8 @@ export default {
     }
 
     const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
-    const tempAudioPath = path.join(TEMP_DIR, `${video.id}_temp`);
-    const ytDlpOutputPath = path.join(TEMP_DIR, `${video.id}.mp3`);
+    const tempAudioPath = path.join(TEMP_DIR, `${video.id}_temp.webm`);
+    const ytdlTempPath = path.join(TEMP_DIR, `${video.id}_ytdl.webm`);
     let finalAudioPath = null;
     const ffmpeg = new Ffmpeg();
 
@@ -133,7 +138,7 @@ export default {
           format: audioFormat
         });
 
-        const fileStream = fs.createWriteStream(tempAudioPath);
+        const fileStream = createWriteStream(tempAudioPath);
 
         await new Promise((resolve, reject) => {
           stream.pipe(fileStream);
@@ -147,7 +152,7 @@ export default {
           throw new Error("empty_file");
         }
 
-        console.log(`Download concluído: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+        console.log(`Download Innertube concluído: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
 
         // Converter para MP3/M4A
         const result = await ffmpeg.convertAudio(tempAudioPath);
@@ -158,25 +163,31 @@ export default {
       } catch (innertubeError) {
         console.log(`Innertube falhou: ${innertubeError.message}`);
         
-        // MÉTODO 2: Fallback para yt-dlp se disponível
-        if (hasYtDlp) {
-          console.log("Tentando download com yt-dlp...");
-          downloadMethod = "yt-dlp";
+        // MÉTODO 2: Fallback para ytdl-core (100% JavaScript)
+        console.log("Tentando download com ytdl-core...");
+        downloadMethod = "ytdl-core";
+        
+        await sendReply("_Usando método alternativo de download..._");
+        
+        try {
+          await downloadWithYtdlCore(video.id, ytdlTempPath);
           
-          await sendReply("_Método alternativo de download ativado..._");
-          
-          const success = await downloadWithYtDlp(video.id, ytDlpOutputPath);
-          
-          if (!success || !fs.existsSync(ytDlpOutputPath)) {
-            throw new Error("yt-dlp também falhou");
+          const stats = fs.statSync(ytdlTempPath);
+          if (stats.size === 0) {
+            throw new Error("Arquivo vazio do ytdl-core");
           }
+
+          console.log(`Download ytdl-core concluído: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+
+          // Converter para MP3/M4A
+          const result = await ffmpeg.convertAudio(ytdlTempPath);
+          finalAudioPath = result.path;
           
-          finalAudioPath = ytDlpOutputPath;
-          console.log("Download com yt-dlp concluído!");
+          console.log(`Conversão concluída: ${result.format.toUpperCase()}`);
           
-        } else {
-          // Se yt-dlp não está disponível, lança o erro original
-          throw innertubeError;
+        } catch (ytdlError) {
+          console.error("ytdl-core também falhou:", ytdlError);
+          throw innertubeError; // Lança o erro original do Innertube
         }
       }
 
@@ -199,33 +210,30 @@ Este vídeo não pode ser baixado sem autenticação.
         `.trim();
         
       } else if (error.message.includes("Streaming data not available") || 
-                 error.message === "no_audio_format") {
+                 error.message === "no_audio_format" ||
+                 error.message.includes("empty_file")) {
         errorMessage = `
-❌ *Não foi possível acessar o áudio deste vídeo*
-
-${hasYtDlp ? "Ambos os métodos falharam." : "💡 *Dica:* Instale o yt-dlp para melhor compatibilidade:\n\n```pip install yt-dlp```"}
-
-Tente outro vídeo ou aguarde alguns minutos.
-
-🔗 Link: ${videoUrl}
-        `.trim();
-        
-      } else if (error.message.includes("yt-dlp também falhou")) {
-        errorMessage = `
-❌ *Nenhum método de download funcionou*
+❌ *Não foi possível baixar este vídeo*
 
 Possíveis causas:
-• Vídeo privado ou bloqueado
-• Restrição geográfica
-• Problema temporário do YouTube
+• Vídeo privado ou com restrições
+• Bloqueio regional
+• Vídeo muito recente (ainda processando)
+• Problemas temporários do YouTube
 
-Tente outro vídeo.
+*Sugestões:*
+• Tente outro vídeo mais popular
+• Aguarde alguns minutos
+• Busque vídeos mais antigos
 
 🔗 Link: ${videoUrl}
         `.trim();
         
+      } else if (error.message.includes("410") || error.message.includes("403")) {
+        errorMessage = "Este vídeo está bloqueado ou foi removido.";
+        
       } else {
-        errorMessage = `Erro: ${error.message}`;
+        errorMessage = `Erro ao processar: ${error.message}`;
       }
       
       throw new WarningError(errorMessage);
@@ -234,10 +242,8 @@ Tente outro vídeo.
       // Limpar arquivos temporários
       const filesToClean = [
         tempAudioPath,
-        tempAudioPath + ".webm",
-        tempAudioPath + ".m4a",
-        finalAudioPath,
-        ytDlpOutputPath
+        ytdlTempPath,
+        finalAudioPath
       ];
       
       for (const file of filesToClean) {
