@@ -1,13 +1,37 @@
 import { PREFIX } from "../../../config.js";
 import { InvalidParameterError, WarningError } from "../../../errors/index.js";
-import { SpiderXApi } from "../../../services/spider-x-api.js";
-import { Ffmpeg } from "../../../services/ffmpeg.js";
+import { Innertube } from "youtubei.js";
+import { Writable } from "node:stream";
+import { createWriteStream } from "node:fs";
 import { unlink } from "node:fs/promises";
+import path from "node:path";
+import { TEMP_DIR } from "../../../config.js";
+import { Ffmpeg } from "../../../services/ffmpeg.js";
+import fs from "node:fs";
+
+// Função auxiliar para ler cookies
+function getYoutubeCookies() {
+  const cookiesPath = path.resolve(process.cwd(), "database", "youtube_cookies.json");
+  if (fs.existsSync(cookiesPath)) {
+    try {
+      // Lê o conteúdo como texto puro, remove espaços em branco e quebras de linha
+      const cookies = fs.readFileSync(cookiesPath, "utf-8").trim();
+      // Verifica se o arquivo não está vazio
+      if (cookies.length > 0) {
+        return cookies;
+      }
+    } catch (e) {
+      console.error("Erro ao ler youtube_cookies.json:", e);
+      return null;
+    }
+  }
+  return null;
+}
 
 export default {
   name: "play",
   description: "Pesquisa e envia o áudio de um vídeo do YouTube",
-  commands: ["play", "pa"],
+  commands: ["play"],
   usage: `${PREFIX}play galinha pintadinha`,
   /**
    * @param {CommandHandleProps} props
@@ -17,7 +41,7 @@ export default {
     sendReply,
     sendWaitReact,
     sendSuccessReact,
-    sendAudioFromUrl,
+    sendAudioFromFile,
     sendErrorReply,
   }) => {
     if (!fullArgs.length) {
@@ -28,56 +52,88 @@ export default {
 
     await sendWaitReact();
 
-    const spiderXApi = new SpiderXApi();
-    let audioUrl = null;
-    let videoInfo = null;
-
+    let innertube;
     try {
-      // 1. Busca o vídeo
-      const searchResults = await spiderXApi.youtubeSearch(fullArgs);
+      const cookieString = getYoutubeCookies();
+      const options = cookieString ? { cookie: cookieString } : {};
+      
+      // Se não houver cookies, ele tentará criar sem autenticação (o que falhará em vídeos restritos)
+      innertube = await Innertube.create(options);
+    } catch (error) {
+      console.error("Erro ao criar Innertube:", error);
+      throw new WarningError("Não foi possível conectar ao YouTube. Tente novamente mais tarde.");
+    }
 
-      if (!searchResults.length) {
+    let video;
+    try {
+      const searchResults = await innertube.search(fullArgs, {
+        type: "video",
+      });
+
+      if (!searchResults.videos.length) {
         throw new WarningError("Nenhum vídeo encontrado para sua pesquisa.");
       }
 
-      const firstVideo = searchResults[0];
-      videoInfo = firstVideo;
+      video = searchResults.videos[0];
+    } catch (error) {
+      console.error("Erro ao buscar vídeo:", error);
+      throw new WarningError("Ocorreu um erro ao buscar o vídeo no YouTube.");
+    }
 
-      // 2. Exibir as informações do vídeo antes de baixar
-      const infoMessage = `
+    const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
+    const tempWebmPath = path.join(TEMP_DIR, `${video.id}_temp.webm` );
+    let finalMp3Path = null;
+    const ffmpeg = new Ffmpeg();
+
+    const infoMessage = `
 *Vídeo Encontrado:*
 
-*Título:* ${firstVideo.title}
-*Canal:* ${firstVideo.author}
-*Duração:* ${firstVideo.duration}
-*Views:* ${firstVideo.views}
-*Link:* ${firstVideo.url}
+*Título:* ${video.title}
+*Canal:* ${video.author.name}
+*Duração:* ${video.duration?.text || 'N/A'}
+*Views:* ${video.views?.text || 'N/A'}
+*Link:* ${videoUrl}
 
-*Iniciando download e envio do áudio...*
+*Iniciando download e conversão para MP3...*
 `;
-      await sendReply(infoMessage);
 
-      // 3. Baixar o áudio
-      // A Spider X API já retorna o link direto para o áudio (geralmente MP3 ou compatível)
-      const downloadResult = await spiderXApi.youtubeDownload(firstVideo.url, "audio");
-      audioUrl = downloadResult.url;
+    await sendReply(infoMessage);
 
-      if (!audioUrl) {
-        throw new WarningError("Não foi possível obter o link de download do áudio.");
-      }
+    try {
+      // 1. Baixar o stream de áudio para um arquivo temporário (webm/m4a)
+      const stream = await innertube.download(video.id, {
+        type: "audio",
+        quality: "best",
+      });
 
-      // 4. Enviar o áudio
-      // sendAudioFromUrl é usado pois a Spider X API retorna uma URL direta
-      await sendAudioFromUrl(audioUrl, true, true);
+      const fileStream = createWriteStream(tempWebmPath);
+
+      await new Promise((resolve, reject) => {
+        stream.pipe(fileStream);
+        stream.on("error", reject);
+        fileStream.on("finish", resolve);
+        fileStream.on("error", reject);
+      });
+
+      // 2. Converter o arquivo temporário para MP3 usando FFmpeg
+      finalMp3Path = await ffmpeg.convertToMp3(tempWebmPath);
+
+      // 3. Enviar o MP3 final
+      await sendAudioFromFile(finalMp3Path, true, true);
       await sendSuccessReact();
     } catch (error) {
-      console.error("Erro no comando /play (Spider X API):", error);
-      // Se o erro for um WarningError, ele já tem a mensagem amigável
-      if (error instanceof WarningError) {
-        throw error;
+      console.error("Erro ao baixar/converter/enviar áudio:", error);
+      throw new WarningError(`Ocorreu um erro ao baixar, converter ou enviar o áudio. Detalhes: ${error.message}`);
+    } finally {
+      // 4. Limpar arquivos temporários
+      try {
+        await ffmpeg.cleanup(tempWebmPath);
+        if (finalMp3Path) {
+          await ffmpeg.cleanup(finalMp3Path);
+        }
+      } catch (e) {
+        console.error("Erro ao deletar arquivos temporários:", e);
       }
-      // Caso contrário, um erro genérico
-      throw new WarningError("Ocorreu um erro ao processar sua solicitação de áudio. Tente novamente mais tarde.");
     }
   },
 };
