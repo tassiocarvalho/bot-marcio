@@ -79,11 +79,24 @@ export default {
     }
 
     // 2. Normalizar o número do alvo para comparação
-    const targetNumber = onlyNumbers(targetLid);
+    let targetNumber = onlyNumbers(targetLid);
+
+    // Garante que o número tenha o DDI 55, se for um número brasileiro de 11 dígitos (DDD + 9º dígito + 8 dígitos)
+    if (targetNumber.length === 11 && targetNumber.startsWith("75")) {
+      targetNumber = "55" + targetNumber;
+    } else if (targetNumber.length === 11 && targetNumber.startsWith("54")) {
+      targetNumber = "55" + targetNumber;
+    } else if (targetNumber.length === 11) {
+      // Para outros DDDS brasileiros de 11 dígitos
+      targetNumber = "55" + targetNumber;
+    } else if (targetNumber.length === 10) {
+      // Para números brasileiros de 10 dígitos (sem o 9º dígito)
+      targetNumber = "55" + targetNumber;
+    }
 
     // 3. Definir as exceções
-    const HETERO_NUMBER = ["5575983258635" , "557583258635", "+55 75 8325-8635", "+55 75 98325-8635", "+5575983258635", "+557583258635" ];
-    const GAY_NUMBER = ["555496630919", "5554996630919", "+555496630919", "+55 54 9663-0919", "+55 54 99663-0919"];
+    const HETERO_NUMBER = "557583258635";
+    const GAY_NUMBER = "555496630919";
 
     let percentage;
 
