@@ -113,7 +113,7 @@ ${targetMention} é ${percentage}% gay!
 `;
 
     // 5. Enviar o GIF e a mensagem com a menção
-    const gifPath = path.resolve(ASSETS_DIR, "images", "funny", range.gif);
+    const gifPath = path.resolve(ASSETS_DIR, "images", "gay", range.gif);
 
     await sendGifFromFile(gifPath, messageText, [targetLid]);
   },
