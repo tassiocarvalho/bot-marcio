@@ -7,7 +7,7 @@ import { TEMP_DIR } from "../../../config.js";
 import { Ffmpeg } from "../../../services/ffmpeg.js";
 import fs from "node:fs";
 
-// Função auxiliar para ler e formatar cookies
+// Função auxiliar para ler e formatar cookies (mantida para uso futuro)
 function getYoutubeCookies() {
   const cookiesPath = path.resolve(process.cwd(), "database", "youtube_cookies.json");
   
@@ -21,7 +21,6 @@ function getYoutubeCookies() {
 
       const cookiesArray = JSON.parse(rawData);
       
-      // Converte para o formato esperado pelo Innertube
       const cookieString = cookiesArray
         .map(cookie => `${cookie.name}=${cookie.value}`)
         .join("; ");
@@ -61,13 +60,11 @@ export default {
 
     let innertube;
     try {
-      const cookieString = getYoutubeCookies();
+      // Desabilitado temporariamente - cookies expirados
+      // const cookieString = getYoutubeCookies();
+      // const options = cookieString ? { cookie: cookieString } : {};
       
-      const options = cookieString 
-        ? { cookie: cookieString } 
-        : {};
-
-      innertube = await Innertube.create(options);
+      innertube = await Innertube.create({}); // Sem cookies
       
     } catch (error) {
       console.error("Erro ao criar Innertube:", error);
@@ -94,8 +91,8 @@ export default {
     }
 
     const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
-    const tempWebmPath = path.join(TEMP_DIR, `${video.id}_temp.webm`);
-    let finalMp3Path = null;
+    const tempAudioPath = path.join(TEMP_DIR, `${video.id}_temp.webm`);
+    let finalAudioPath = null;
     const ffmpeg = new Ffmpeg();
 
     const infoMessage = `
@@ -106,7 +103,7 @@ export default {
 *Views:* ${video.views?.text || 'N/A'}
 *Link:* ${videoUrl}
 
-*Iniciando download e conversão para MP3...*
+*Iniciando download e conversão...*
     `;
     
     await sendReply(infoMessage);
@@ -122,14 +119,24 @@ export default {
         );
       }
 
-      // Tentar baixar o stream de áudio
-      const stream = await innertube.download(video.id, {
-        type: "audio",
-        quality: "best",
-        format: "mp4", // Força formato mp4/m4a que é mais confiável
+      // Tenta obter o formato de áudio diretamente
+      const audioFormat = videoInfo.chooseFormat({
+        type: 'audio',
+        quality: 'best'
       });
 
-      const fileStream = createWriteStream(tempWebmPath);
+      if (!audioFormat) {
+        throw new Error("Nenhum formato de áudio disponível para este vídeo");
+      }
+
+      console.log(`Formato de áudio selecionado: ${audioFormat.mime_type}`);
+
+      // Baixar o stream de áudio com o formato específico
+      const stream = await innertube.download(video.id, {
+        format: audioFormat
+      });
+
+      const fileStream = createWriteStream(tempAudioPath);
 
       await new Promise((resolve, reject) => {
         stream.pipe(fileStream);
@@ -145,16 +152,21 @@ export default {
       });
 
       // Verificar se o arquivo foi criado e tem conteúdo
-      const stats = fs.statSync(tempWebmPath);
+      const stats = fs.statSync(tempAudioPath);
       if (stats.size === 0) {
         throw new Error("Arquivo de áudio vazio");
       }
 
-      // Converter para MP3
-      finalMp3Path = await ffmpeg.convertToMp3(tempWebmPath);
+      console.log(`Arquivo baixado: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+
+      // Converter para MP3 ou M4A (com fallback automático)
+      const result = await ffmpeg.convertAudio(tempAudioPath);
+      finalAudioPath = result.path;
+      
+      console.log(`Conversão concluída para: ${result.format.toUpperCase()}`);
 
       // Enviar o áudio
-      await sendAudioFromFile(finalMp3Path, true, true);
+      await sendAudioFromFile(finalAudioPath, true, true);
       await sendSuccessReact();
       
     } catch (error) {
@@ -163,27 +175,31 @@ export default {
       // Mensagens de erro mais específicas
       let errorMessage = "Ocorreu um erro ao processar o áudio.";
       
-      if (error.message.includes("No valid URL")) {
+      if (error.message.includes("No valid URL") || error.message.includes("decipher")) {
         errorMessage = `
 ❌ *Não foi possível baixar este vídeo.*
 
 Possíveis causas:
 • Vídeo com restrição de idade
 • Vídeo privado ou bloqueado
-• Cookies do YouTube expirados
 • Restrição geográfica
+• Vídeo muito recente (processamento pendente)
 
 *Sugestões:*
-1. Tente outro vídeo
-2. Atualize os cookies do YouTube
-3. Tente um vídeo mais popular/público
+1. Tente outro vídeo mais popular
+2. Aguarde alguns minutos e tente novamente
+3. Busque por vídeos mais antigos/estabelecidos
 
 🔗 Link: ${videoUrl}
         `.trim();
       } else if (error.message.includes("age_restricted")) {
-        errorMessage = "Este vídeo possui restrição de idade e não pode ser baixado.";
+        errorMessage = "Este vídeo possui restrição de idade e não pode ser baixado sem autenticação.";
+      } else if (error.message.includes("Nenhum formato")) {
+        errorMessage = "Este vídeo não possui formato de áudio compatível para download.";
+      } else if (error.message.includes("FFmpeg")) {
+        errorMessage = `Erro na conversão de áudio: ${error.message}. Verifique se o FFmpeg está instalado corretamente.`;
       } else {
-        errorMessage = `Erro: ${error.message}`;
+        errorMessage = `Erro ao processar: ${error.message}`;
       }
       
       throw new WarningError(errorMessage);
@@ -191,11 +207,11 @@ Possíveis causas:
     } finally {
       // Limpar arquivos temporários
       try {
-        if (fs.existsSync(tempWebmPath)) {
-          await ffmpeg.cleanup(tempWebmPath);
+        if (fs.existsSync(tempAudioPath)) {
+          await ffmpeg.cleanup(tempAudioPath);
         }
-        if (finalMp3Path && fs.existsSync(finalMp3Path)) {
-          await ffmpeg.cleanup(finalMp3Path);
+        if (finalAudioPath && fs.existsSync(finalAudioPath)) {
+          await ffmpeg.cleanup(finalAudioPath);
         }
       } catch (e) {
         console.error("Erro ao deletar arquivos temporários:", e);
