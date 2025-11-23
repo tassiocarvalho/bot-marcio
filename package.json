@@ -24,6 +24,7 @@
     "node-webpmux": "^3.2.1",
     "openai": "^6.9.0",
     "pino": "^10.1.0",
-    "tiktoken": "^1.0.21"
+    "tiktoken": "^1.0.21",
+    "youtubei.js": "^16.0.1"
   }
 }
