@@ -55,6 +55,8 @@ export default {
 import { PREFIX } from "../../../config.js";
 import { InvalidParameterError } from "../../../errors/index.js";
 import { onlyNumbers } from "../../../utils/index.js";
+import path from "node:path";
+import { ASSETS_DIR } from "../../../config.js";
 
 /**
  * Função para selecionar N elementos aleatórios de um array.
@@ -76,10 +78,10 @@ export default {
   /**
    * @param {CommandHandleProps} props
    */
-  handle: async ({ sendReply, socket, remoteJid }) => {
+  handle: async ({ sendGifFromFile, socket, remoteJid }) => {
     const { participants } = await socket.groupMetadata(remoteJid);
 
-    if (!participants || participants.length < 5) {
+    if (!participants || participants.length < 2) {
       throw new InvalidParameterError(
         "Este comando só pode ser usado em grupos com pelo menos 5 membros."
       );
@@ -87,7 +89,7 @@ export default {
 
     // 1. Selecionar 5 membros aleatórios
     // A lista de participantes do groupMetadata já vem no formato correto { id: '...', admin: '...' }
-    const gadosSelecionados = getRandomElements(participants, 5);
+    const gadosSelecionados = getRandomElements(participants, 2);
 
     // 2. Mapear os LIDs dos membros para a lista de menções
     const gadosLids = gadosSelecionados.map((m) => m.id);
@@ -103,8 +105,13 @@ ${gadosLids
 ==============================
 `;
 
-    // 4. Enviar a mensagem com as menções
-    // O sendReply precisa do array de LIDs para garantir que as menções funcionem.
-    await sendReply(mensagem, { mentions: gadosLids });
+    // 4. Enviar a mensagem com as menções usando sendGifFromFile para forçar o processamento correto das menções
+    const gifPath = path.resolve(ASSETS_DIR, "images", "funny", "gintama-gintoki.mp4"); // Usando um GIF genérico
+
+    await sendGifFromFile(
+      gifPath,
+      mensagem,
+      gadosLids
+    );
   },
 };
