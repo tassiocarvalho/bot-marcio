@@ -1,39 +1,39 @@
 import { PREFIX } from "../../../config.js";
 import { InvalidParameterError, WarningError } from "../../../errors/index.js";
 import { Innertube } from "youtubei.js";
-import { createWriteStream } from "node:fs";
+import { exec } from "child_process";
+import { promisify } from "util";
 import path from "node:path";
 import { TEMP_DIR } from "../../../config.js";
 import { Ffmpeg } from "../../../services/ffmpeg.js";
 import fs from "node:fs";
 
-// Função auxiliar para ler e formatar cookies (mantida para uso futuro)
-function getYoutubeCookies() {
-  const cookiesPath = path.resolve(process.cwd(), "database", "youtube_cookies.json");
-  
-  if (fs.existsSync(cookiesPath)) {
-    try {
-      const rawData = fs.readFileSync(cookiesPath, "utf-8").trim();
-      
-      if (rawData.length === 0) {
-        return null;
-      }
+const execPromise = promisify(exec);
 
-      const cookiesArray = JSON.parse(rawData);
-      
-      const cookieString = cookiesArray
-        .map(cookie => `${cookie.name}=${cookie.value}`)
-        .join("; ");
-      
-      return cookieString;
-      
-    } catch (e) {
-      console.error("Erro ao processar youtube_cookies.json:", e);
-      return null;
-    }
-  }
+// Função para baixar áudio usando yt-dlp como fallback
+async function downloadWithYtDlp(videoId, outputPath) {
+  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
   
-  return null;
+  // Comando yt-dlp otimizado para áudio
+  const command = `yt-dlp -f "bestaudio" --extract-audio --audio-format mp3 --audio-quality 192K -o "${outputPath}" "${videoUrl}"`;
+  
+  try {
+    await execPromise(command, { maxBuffer: 1024 * 1024 * 50 }); // 50MB buffer
+    return true;
+  } catch (error) {
+    console.error("Erro no yt-dlp:", error);
+    return false;
+  }
+}
+
+// Verifica se yt-dlp está instalado
+async function isYtDlpInstalled() {
+  try {
+    await execPromise("yt-dlp --version");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export default {
@@ -58,14 +58,12 @@ export default {
 
     await sendWaitReact();
 
+    // Verificar se yt-dlp está disponível
+    const hasYtDlp = await isYtDlpInstalled();
+    
     let innertube;
     try {
-      // Desabilitado temporariamente - cookies expirados
-      // const cookieString = getYoutubeCookies();
-      // const options = cookieString ? { cookie: cookieString } : {};
-      
-      innertube = await Innertube.create({}); // Sem cookies
-      
+      innertube = await Innertube.create({});
     } catch (error) {
       console.error("Erro ao criar Innertube:", error);
       throw new WarningError(
@@ -91,7 +89,8 @@ export default {
     }
 
     const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
-    const tempAudioPath = path.join(TEMP_DIR, `${video.id}_temp.webm`);
+    const tempAudioPath = path.join(TEMP_DIR, `${video.id}_temp`);
+    const ytDlpOutputPath = path.join(TEMP_DIR, `${video.id}.mp3`);
     let finalAudioPath = null;
     const ffmpeg = new Ffmpeg();
 
@@ -103,118 +102,152 @@ export default {
 *Views:* ${video.views?.text || 'N/A'}
 *Link:* ${videoUrl}
 
-*Iniciando download e conversão...*
+*Iniciando download...*
     `;
     
     await sendReply(infoMessage);
 
+    let downloadMethod = "innertube";
+    
     try {
-      // Buscar informações detalhadas do vídeo
-      const videoInfo = await innertube.getInfo(video.id);
-      
-      // Verificar se o vídeo tem restrições
-      if (videoInfo.basic_info.is_age_restricted) {
-        throw new WarningError(
-          "Este vídeo possui restrição de idade. Não é possível baixá-lo no momento."
-        );
-      }
+      // MÉTODO 1: Tentar com Innertube primeiro
+      try {
+        console.log("Tentando download com Innertube...");
+        
+        const videoInfo = await innertube.getInfo(video.id);
+        
+        if (videoInfo.basic_info.is_age_restricted) {
+          throw new Error("age_restricted");
+        }
 
-      // Tenta obter o formato de áudio diretamente
-      const audioFormat = videoInfo.chooseFormat({
-        type: 'audio',
-        quality: 'best'
-      });
-
-      if (!audioFormat) {
-        throw new Error("Nenhum formato de áudio disponível para este vídeo");
-      }
-
-      console.log(`Formato de áudio selecionado: ${audioFormat.mime_type}`);
-
-      // Baixar o stream de áudio com o formato específico
-      const stream = await innertube.download(video.id, {
-        format: audioFormat
-      });
-
-      const fileStream = createWriteStream(tempAudioPath);
-
-      await new Promise((resolve, reject) => {
-        stream.pipe(fileStream);
-        stream.on("error", (err) => {
-          console.error("Erro no stream:", err);
-          reject(err);
+        const audioFormat = videoInfo.chooseFormat({
+          type: 'audio',
+          quality: 'best'
         });
-        fileStream.on("finish", resolve);
-        fileStream.on("error", (err) => {
-          console.error("Erro ao escrever arquivo:", err);
-          reject(err);
+
+        if (!audioFormat) {
+          throw new Error("no_audio_format");
+        }
+
+        const stream = await innertube.download(video.id, {
+          format: audioFormat
         });
-      });
 
-      // Verificar se o arquivo foi criado e tem conteúdo
-      const stats = fs.statSync(tempAudioPath);
-      if (stats.size === 0) {
-        throw new Error("Arquivo de áudio vazio");
+        const fileStream = fs.createWriteStream(tempAudioPath);
+
+        await new Promise((resolve, reject) => {
+          stream.pipe(fileStream);
+          stream.on("error", reject);
+          fileStream.on("finish", resolve);
+          fileStream.on("error", reject);
+        });
+
+        const stats = fs.statSync(tempAudioPath);
+        if (stats.size === 0) {
+          throw new Error("empty_file");
+        }
+
+        console.log(`Download concluído: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+
+        // Converter para MP3/M4A
+        const result = await ffmpeg.convertAudio(tempAudioPath);
+        finalAudioPath = result.path;
+        
+        console.log(`Conversão concluída: ${result.format.toUpperCase()}`);
+
+      } catch (innertubeError) {
+        console.log(`Innertube falhou: ${innertubeError.message}`);
+        
+        // MÉTODO 2: Fallback para yt-dlp se disponível
+        if (hasYtDlp) {
+          console.log("Tentando download com yt-dlp...");
+          downloadMethod = "yt-dlp";
+          
+          await sendReply("_Método alternativo de download ativado..._");
+          
+          const success = await downloadWithYtDlp(video.id, ytDlpOutputPath);
+          
+          if (!success || !fs.existsSync(ytDlpOutputPath)) {
+            throw new Error("yt-dlp também falhou");
+          }
+          
+          finalAudioPath = ytDlpOutputPath;
+          console.log("Download com yt-dlp concluído!");
+          
+        } else {
+          // Se yt-dlp não está disponível, lança o erro original
+          throw innertubeError;
+        }
       }
-
-      console.log(`Arquivo baixado: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
-
-      // Converter para MP3 ou M4A (com fallback automático)
-      const result = await ffmpeg.convertAudio(tempAudioPath);
-      finalAudioPath = result.path;
-      
-      console.log(`Conversão concluída para: ${result.format.toUpperCase()}`);
 
       // Enviar o áudio
       await sendAudioFromFile(finalAudioPath, true, true);
       await sendSuccessReact();
       
     } catch (error) {
-      console.error("Erro detalhado ao processar áudio:", error);
+      console.error("Erro detalhado:", error);
       
-      // Mensagens de erro mais específicas
       let errorMessage = "Ocorreu um erro ao processar o áudio.";
       
-      if (error.message.includes("No valid URL") || error.message.includes("decipher")) {
+      if (error.message === "age_restricted") {
         errorMessage = `
-❌ *Não foi possível baixar este vídeo.*
+❌ *Vídeo com restrição de idade*
 
-Possíveis causas:
-• Vídeo com restrição de idade
-• Vídeo privado ou bloqueado
-• Restrição geográfica
-• Vídeo muito recente (processamento pendente)
-
-*Sugestões:*
-1. Tente outro vídeo mais popular
-2. Aguarde alguns minutos e tente novamente
-3. Busque por vídeos mais antigos/estabelecidos
+Este vídeo não pode ser baixado sem autenticação.
 
 🔗 Link: ${videoUrl}
         `.trim();
-      } else if (error.message.includes("age_restricted")) {
-        errorMessage = "Este vídeo possui restrição de idade e não pode ser baixado sem autenticação.";
-      } else if (error.message.includes("Nenhum formato")) {
-        errorMessage = "Este vídeo não possui formato de áudio compatível para download.";
-      } else if (error.message.includes("FFmpeg")) {
-        errorMessage = `Erro na conversão de áudio: ${error.message}. Verifique se o FFmpeg está instalado corretamente.`;
+        
+      } else if (error.message.includes("Streaming data not available") || 
+                 error.message === "no_audio_format") {
+        errorMessage = `
+❌ *Não foi possível acessar o áudio deste vídeo*
+
+${hasYtDlp ? "Ambos os métodos falharam." : "💡 *Dica:* Instale o yt-dlp para melhor compatibilidade:\n\n```pip install yt-dlp```"}
+
+Tente outro vídeo ou aguarde alguns minutos.
+
+🔗 Link: ${videoUrl}
+        `.trim();
+        
+      } else if (error.message.includes("yt-dlp também falhou")) {
+        errorMessage = `
+❌ *Nenhum método de download funcionou*
+
+Possíveis causas:
+• Vídeo privado ou bloqueado
+• Restrição geográfica
+• Problema temporário do YouTube
+
+Tente outro vídeo.
+
+🔗 Link: ${videoUrl}
+        `.trim();
+        
       } else {
-        errorMessage = `Erro ao processar: ${error.message}`;
+        errorMessage = `Erro: ${error.message}`;
       }
       
       throw new WarningError(errorMessage);
       
     } finally {
       // Limpar arquivos temporários
-      try {
-        if (fs.existsSync(tempAudioPath)) {
-          await ffmpeg.cleanup(tempAudioPath);
+      const filesToClean = [
+        tempAudioPath,
+        tempAudioPath + ".webm",
+        tempAudioPath + ".m4a",
+        finalAudioPath,
+        ytDlpOutputPath
+      ];
+      
+      for (const file of filesToClean) {
+        try {
+          if (file && fs.existsSync(file)) {
+            await ffmpeg.cleanup(file);
+          }
+        } catch (e) {
+          console.error(`Erro ao deletar ${file}:`, e);
         }
-        if (finalAudioPath && fs.existsSync(finalAudioPath)) {
-          await ffmpeg.cleanup(finalAudioPath);
-        }
-      } catch (e) {
-        console.error("Erro ao deletar arquivos temporários:", e);
       }
     }
   },
