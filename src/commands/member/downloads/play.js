@@ -1,35 +1,63 @@
 import { PREFIX } from "../../../config.js";
 import { InvalidParameterError, WarningError } from "../../../errors/index.js";
 import { Innertube } from "youtubei.js";
-import ytdl from "ytdl-core";
+import ytdl from "@distube/ytdl-core";
 import { createWriteStream } from "node:fs";
 import path from "node:path";
 import { TEMP_DIR } from "../../../config.js";
 import { Ffmpeg } from "../../../services/ffmpeg.js";
 import fs from "node:fs";
 
-// Função para baixar com ytdl-core (100% JavaScript)
-async function downloadWithYtdlCore(videoId, outputPath) {
+// Agente para evitar bloqueios do YouTube
+const agent = ytdl.createAgent();
+
+// Função para baixar com @distube/ytdl-core
+async function downloadWithYtdl(videoId, outputPath) {
   const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
   
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
+      // Verificar se o vídeo existe e é acessível
+      const info = await ytdl.getInfo(videoUrl, { agent });
+      
+      console.log(`Título: ${info.videoDetails.title}`);
+      console.log(`Duração: ${info.videoDetails.lengthSeconds}s`);
+      
+      // Filtrar apenas formatos de áudio
+      const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
+      
+      if (!audioFormats.length) {
+        throw new Error("Nenhum formato de áudio disponível");
+      }
+      
+      console.log(`Formatos de áudio disponíveis: ${audioFormats.length}`);
+      
+      // Baixar com o melhor formato de áudio
       const stream = ytdl(videoUrl, {
         quality: 'highestaudio',
-        filter: 'audioonly'
+        filter: 'audioonly',
+        agent: agent
       });
 
       const fileStream = createWriteStream(outputPath);
 
+      let downloadedBytes = 0;
+
+      stream.on('progress', (chunkLength, downloaded, total) => {
+        downloadedBytes = downloaded;
+        const percent = ((downloaded / total) * 100).toFixed(1);
+        console.log(`Download: ${percent}% (${(downloaded / 1024 / 1024).toFixed(2)} MB)`);
+      });
+
       stream.pipe(fileStream);
 
       stream.on('error', (err) => {
-        console.error('Erro no ytdl stream:', err);
+        console.error('Erro no stream:', err);
         reject(err);
       });
 
       fileStream.on('finish', () => {
-        console.log('Download ytdl-core concluído');
+        console.log(`Download concluído: ${(downloadedBytes / 1024 / 1024).toFixed(2)} MB`);
         resolve(true);
       });
 
@@ -94,8 +122,7 @@ export default {
     }
 
     const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
-    const tempAudioPath = path.join(TEMP_DIR, `${video.id}_temp.webm`);
-    const ytdlTempPath = path.join(TEMP_DIR, `${video.id}_ytdl.webm`);
+    const tempAudioPath = path.join(TEMP_DIR, `${video.id}_audio.webm`);
     let finalAudioPath = null;
     const ffmpeg = new Ffmpeg();
 
@@ -107,89 +134,36 @@ export default {
 *Views:* ${video.views?.text || 'N/A'}
 *Link:* ${videoUrl}
 
-*Iniciando download...*
+*Baixando áudio...*
     `;
     
     await sendReply(infoMessage);
-
-    let downloadMethod = "innertube";
     
     try {
-      // MÉTODO 1: Tentar com Innertube primeiro
-      try {
-        console.log("Tentando download com Innertube...");
-        
-        const videoInfo = await innertube.getInfo(video.id);
-        
-        if (videoInfo.basic_info.is_age_restricted) {
-          throw new Error("age_restricted");
-        }
-
-        const audioFormat = videoInfo.chooseFormat({
-          type: 'audio',
-          quality: 'best'
-        });
-
-        if (!audioFormat) {
-          throw new Error("no_audio_format");
-        }
-
-        const stream = await innertube.download(video.id, {
-          format: audioFormat
-        });
-
-        const fileStream = createWriteStream(tempAudioPath);
-
-        await new Promise((resolve, reject) => {
-          stream.pipe(fileStream);
-          stream.on("error", reject);
-          fileStream.on("finish", resolve);
-          fileStream.on("error", reject);
-        });
-
-        const stats = fs.statSync(tempAudioPath);
-        if (stats.size === 0) {
-          throw new Error("empty_file");
-        }
-
-        console.log(`Download Innertube concluído: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
-
-        // Converter para MP3/M4A
-        const result = await ffmpeg.convertAudio(tempAudioPath);
-        finalAudioPath = result.path;
-        
-        console.log(`Conversão concluída: ${result.format.toUpperCase()}`);
-
-      } catch (innertubeError) {
-        console.log(`Innertube falhou: ${innertubeError.message}`);
-        
-        // MÉTODO 2: Fallback para ytdl-core (100% JavaScript)
-        console.log("Tentando download com ytdl-core...");
-        downloadMethod = "ytdl-core";
-        
-        await sendReply("_Usando método alternativo de download..._");
-        
-        try {
-          await downloadWithYtdlCore(video.id, ytdlTempPath);
-          
-          const stats = fs.statSync(ytdlTempPath);
-          if (stats.size === 0) {
-            throw new Error("Arquivo vazio do ytdl-core");
-          }
-
-          console.log(`Download ytdl-core concluído: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
-
-          // Converter para MP3/M4A
-          const result = await ffmpeg.convertAudio(ytdlTempPath);
-          finalAudioPath = result.path;
-          
-          console.log(`Conversão concluída: ${result.format.toUpperCase()}`);
-          
-        } catch (ytdlError) {
-          console.error("ytdl-core também falhou:", ytdlError);
-          throw innertubeError; // Lança o erro original do Innertube
-        }
+      // Usar diretamente o @distube/ytdl-core (mais confiável)
+      console.log("Iniciando download com @distube/ytdl-core...");
+      
+      await downloadWithYtdl(video.id, tempAudioPath);
+      
+      // Verificar se o arquivo foi criado
+      if (!fs.existsSync(tempAudioPath)) {
+        throw new Error("Arquivo de áudio não foi criado");
       }
+
+      const stats = fs.statSync(tempAudioPath);
+      if (stats.size === 0) {
+        throw new Error("Arquivo de áudio está vazio");
+      }
+
+      console.log(`Arquivo baixado: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+
+      // Converter para MP3/M4A
+      await sendReply("_Convertendo para MP3..._");
+      
+      const result = await ffmpeg.convertAudio(tempAudioPath);
+      finalAudioPath = result.path;
+      
+      console.log(`Conversão concluída: ${result.format.toUpperCase()}`);
 
       // Enviar o áudio
       await sendAudioFromFile(finalAudioPath, true, true);
@@ -200,51 +174,86 @@ export default {
       
       let errorMessage = "Ocorreu um erro ao processar o áudio.";
       
-      if (error.message === "age_restricted") {
+      if (error.message.includes("Video unavailable")) {
         errorMessage = `
-❌ *Vídeo com restrição de idade*
+❌ *Vídeo indisponível*
 
-Este vídeo não pode ser baixado sem autenticação.
+Este vídeo não pode ser acessado. Pode estar:
+• Privado
+• Removido
+• Bloqueado na sua região
 
 🔗 Link: ${videoUrl}
         `.trim();
         
-      } else if (error.message.includes("Streaming data not available") || 
-                 error.message === "no_audio_format" ||
-                 error.message.includes("empty_file")) {
+      } else if (error.message.includes("age")) {
         errorMessage = `
-❌ *Não foi possível baixar este vídeo*
+❌ *Vídeo com restrição de idade*
 
-Possíveis causas:
-• Vídeo privado ou com restrições
-• Bloqueio regional
-• Vídeo muito recente (ainda processando)
-• Problemas temporários do YouTube
+Este vídeo requer autenticação para ser baixado.
 
-*Sugestões:*
-• Tente outro vídeo mais popular
-• Aguarde alguns minutos
-• Busque vídeos mais antigos
+🔗 Link: ${videoUrl}
+        `.trim();
+        
+      } else if (error.message.includes("premieres in") || 
+                 error.message.includes("This live event")) {
+        errorMessage = `
+❌ *Vídeo ao vivo ou agendado*
+
+Este conteúdo ainda não está disponível para download.
 
 🔗 Link: ${videoUrl}
         `.trim();
         
       } else if (error.message.includes("410") || error.message.includes("403")) {
-        errorMessage = "Este vídeo está bloqueado ou foi removido.";
+        errorMessage = `
+❌ *Acesso negado*
+
+O YouTube bloqueou o acesso a este vídeo.
+Tente outro vídeo ou aguarde alguns minutos.
+
+🔗 Link: ${videoUrl}
+        `.trim();
+        
+      } else if (error.message.includes("Nenhum formato")) {
+        errorMessage = `
+❌ *Formato de áudio não disponível*
+
+Este vídeo não possui áudio para download.
+
+🔗 Link: ${videoUrl}
+        `.trim();
+        
+      } else if (error.message.includes("FFmpeg")) {
+        errorMessage = `
+❌ *Erro na conversão*
+
+O áudio foi baixado mas houve erro ao converter.
+Detalhes: ${error.message}
+
+🔗 Link: ${videoUrl}
+        `.trim();
         
       } else {
-        errorMessage = `Erro ao processar: ${error.message}`;
+        errorMessage = `
+❌ *Erro ao processar*
+
+${error.message}
+
+Tente:
+• Outro vídeo
+• Aguardar alguns minutos
+• Um vídeo mais popular/antigo
+
+🔗 Link: ${videoUrl}
+        `.trim();
       }
       
       throw new WarningError(errorMessage);
       
     } finally {
       // Limpar arquivos temporários
-      const filesToClean = [
-        tempAudioPath,
-        ytdlTempPath,
-        finalAudioPath
-      ];
+      const filesToClean = [tempAudioPath, finalAudioPath];
       
       for (const file of filesToClean) {
         try {
