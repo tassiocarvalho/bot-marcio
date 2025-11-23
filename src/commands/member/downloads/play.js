@@ -6,7 +6,30 @@ import { createWriteStream } from "node:fs";
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { TEMP_DIR } from "../../../config.js";
-import { Ffmpeg } from "../../../services/ffmpeg.js"; // Importar Ffmpeg
+import { Ffmpeg } from "../../../services/ffmpeg.js";
+import fs from "node:fs";
+
+// Função auxiliar para ler cookies
+function getYoutubeCookies() {
+  const cookiesPath = path.resolve(process.cwd(), "database", "youtube_cookies.json");
+  if (fs.existsSync(cookiesPath)) {
+    try {
+      const cookies = fs.readFileSync(cookiesPath, "utf-8");
+      // O Innertube espera uma string de cookies no formato "cookie1=valor1; cookie2=valor2"
+      // Assumindo que o arquivo JSON contém um array de strings de cookies ou uma string única.
+      // Se for um array de strings, juntamos com '; '. Se for uma string, retornamos.
+      const parsed = JSON.parse(cookies);
+      if (Array.isArray(parsed)) {
+          return parsed.join('; ');
+      }
+      return parsed; // Se for uma string única
+    } catch (e) {
+      console.error("Erro ao ler ou parsear youtube_cookies.json:", e);
+      return null;
+    }
+  }
+  return null;
+}
 
 export default {
   name: "play",
@@ -34,7 +57,11 @@ export default {
 
     let innertube;
     try {
-      innertube = await Innertube.create();
+      const cookieString = getYoutubeCookies();
+      const options = cookieString ? { cookie: cookieString } : {};
+      
+      // Se não houver cookies, ele tentará criar sem autenticação (o que falhará em vídeos restritos)
+      innertube = await Innertube.create(options);
     } catch (error) {
       console.error("Erro ao criar Innertube:", error);
       throw new WarningError("Não foi possível conectar ao YouTube. Tente novamente mais tarde.");
@@ -57,7 +84,7 @@ export default {
     }
 
     const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
-    const tempWebmPath = path.join(TEMP_DIR, `${video.id}_temp.webm` ); // Usando .webm como extensão temporária
+    const tempWebmPath = path.join(TEMP_DIR, `${video.id}_temp.webm` );
     let finalMp3Path = null;
     const ffmpeg = new Ffmpeg();
 
@@ -99,7 +126,6 @@ export default {
       await sendSuccessReact();
     } catch (error) {
       console.error("Erro ao baixar/converter/enviar áudio:", error);
-      // Propaga o erro exato do FFmpeg ou da operação de download
       throw new WarningError(`Ocorreu um erro ao baixar, converter ou enviar o áudio. Detalhes: ${error.message}`);
     } finally {
       // 4. Limpar arquivos temporários
