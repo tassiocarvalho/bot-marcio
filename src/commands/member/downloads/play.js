@@ -57,7 +57,6 @@ export default {
       const cookieString = getYoutubeCookies();
       const options = cookieString ? { cookie: cookieString } : {};
       
-      // Se não houver cookies, ele tentará criar sem autenticação (o que falhará em vídeos restritos)
       innertube = await Innertube.create(options);
     } catch (error) {
       console.error("Erro ao criar Innertube:", error);
@@ -77,7 +76,8 @@ export default {
       video = searchResults.videos[0];
     } catch (error) {
       console.error("Erro ao buscar vídeo:", error);
-      throw new WarningError("Ocorreu um erro ao buscar o vídeo no YouTube.");
+      // CORREÇÃO: Exibir o erro exato da busca
+      throw new WarningError(`Ocorreu um erro ao buscar o vídeo no YouTube. Detalhes: ${error.message}`);
     }
 
     const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
