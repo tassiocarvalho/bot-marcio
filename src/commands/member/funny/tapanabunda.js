@@ -102,7 +102,7 @@ export default {
 🔥 *PLAFT!* 🔥
 `;
 
-    const gifPath = path.resolve(ASSETS_DIR, "images", "tapa", "tapa.mp4");
+    const gifPath = path.resolve(ASSETS_DIR, "images", "tapa", "tapa_bunda.mp4");
     await sendGifFromFile(gifPath, messageText, [sender, targetLid]);
   },
 };
