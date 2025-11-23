@@ -107,7 +107,7 @@ export default {
     const targetNumber = onlyNumbers(targetLid);
 
     await sendGifFromFile(
-      path.resolve(ASSETS_DIR, "images", "funny", "tapa_bunda.mp4"),
+      path.resolve(ASSETS_DIR, "images", "tapa", "tapa_bunda.mp4"),
       `@${userNumber} deu um tapa na bunda de @${targetNumber}! 👋🍑`,
       [userLid, targetLid]
     );
