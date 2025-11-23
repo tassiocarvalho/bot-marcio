@@ -26,7 +26,7 @@ const GAY_RANGES = [
   { min: 50, max: 75, message: "É gay. Orgulho! 🏳️‍🌈", gif: "gay_3.mp4" },
   { min: 76, max: 99, message: "É gayzão! Não tem mais volta! 🌈", gif: "gay_4.mp4" },
   { min: 100, max: 100, message: "É o gay mais gay da terra! 👑", gif: "gay_5.mp4" },
-  { min: 101, max: 101, message: "Márcio é o ser mais gay do planeta terra esse adora dar o cu até fazer bico! 🌈✨👑", gif: "gay_6.mp4" },
+  { min: 101, max: 101, message: "Márcio é o ser mais gay do planeta terra esse adora dar o cu até fazer bico! 🌈✨👑", gif: "marcio_gay.mp4" },
 ];
 
 function getRealPhoneNumber(lid) {
