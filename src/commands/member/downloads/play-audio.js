@@ -5,7 +5,7 @@ import { play } from "../../../services/spider-x-api.js";
 export default {
   name: "play-audio",
   description: "Faço o download de músicas",
-  commands: ["play-audio", "play", "pa"],
+  //commands: ["play-audio", "play", "pa"],
   usage: `${PREFIX}play-audio MC Hariel`,
   /**
    * @param {CommandHandleProps} props
