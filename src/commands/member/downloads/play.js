@@ -14,17 +14,14 @@ function getYoutubeCookies() {
   const cookiesPath = path.resolve(process.cwd(), "database", "youtube_cookies.json");
   if (fs.existsSync(cookiesPath)) {
     try {
-      const cookies = fs.readFileSync(cookiesPath, "utf-8");
-      // O Innertube espera uma string de cookies no formato "cookie1=valor1; cookie2=valor2"
-      // Assumindo que o arquivo JSON contém um array de strings de cookies ou uma string única.
-      // Se for um array de strings, juntamos com '; '. Se for uma string, retornamos.
-      const parsed = JSON.parse(cookies);
-      if (Array.isArray(parsed)) {
-          return parsed.join('; ');
+      // Lê o conteúdo como texto puro, remove espaços em branco e quebras de linha
+      const cookies = fs.readFileSync(cookiesPath, "utf-8").trim();
+      // Verifica se o arquivo não está vazio
+      if (cookies.length > 0) {
+        return cookies;
       }
-      return parsed; // Se for uma string única
     } catch (e) {
-      console.error("Erro ao ler ou parsear youtube_cookies.json:", e);
+      console.error("Erro ao ler youtube_cookies.json:", e);
       return null;
     }
   }
