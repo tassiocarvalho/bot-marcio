@@ -81,7 +81,7 @@ export default {
     // Verifica se há participantes suficientes no grupo
     if (!participants || participants.length < 5) {
       throw new InvalidParameterError(
-        "Este comando só pode ser usado em grupos com pelo menos 5 membros."
+        "EU SOU BURRO"
       );
     }
 
