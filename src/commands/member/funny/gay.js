@@ -82,8 +82,8 @@ export default {
     const targetNumber = onlyNumbers(targetLid);
 
     // 3. Definir as exceções
-    const HETERO_NUMBER = "5575983258635";
-    const GAY_NUMBER = "555496630919";
+    const HETERO_NUMBER = ["5575983258635" , "557583258635", "+55 75 8325-8635", "+55 75 98325-8635", "+5575983258635", "+557583258635" ];
+    const GAY_NUMBER = ["555496630919", "5554996630919", "+555496630919", "+55 54 9663-0919", "+55 54 99663-0919"];
 
     let percentage;
 
