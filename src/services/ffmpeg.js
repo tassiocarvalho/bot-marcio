@@ -19,6 +19,11 @@ class Ffmpeg {
     return new Promise((resolve, reject) => {
       exec(command, (error, stdout, stderr) => {
         if (error) {
+          if (error.code === 127) {
+            // Código de erro 127 geralmente significa "command not found"
+            errorLog("FFmpeg não encontrado. Certifique-se de que está instalado e no PATH.");
+            return reject(new Error("FFmpeg não está instalado ou acessível."));
+          }
           errorLog(`Command error: ${stderr}`);
           return reject(error);
         }
@@ -76,7 +81,7 @@ class Ffmpeg {
    */
   async convertToMp3(inputPath) {
     const outputPath = await this._createTempFilePath("mp3");
-    // -vn: remove vídeo, -acodec libmp3lame: usa codec mp3, -q:a 0: qualidade máxima
+    // Comando mais simples e robusto para conversão de áudio para MP3
     const command = `ffmpeg -i ${inputPath} -vn -acodec libmp3lame -q:a 0 ${outputPath}`;
     await this._executeCommand(command);
     return outputPath;
