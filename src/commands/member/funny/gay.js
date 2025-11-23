@@ -82,8 +82,8 @@ export default {
     const targetNumber = onlyNumbers(targetLid);
 
     // 3. Definir as exceções
-    const HETERO_NUMBER = "+55 75 8325-8635";
-    const GAY_NUMBER = "+55 54 9663-0919";
+    const HETERO_NUMBER = ["5575983258635" , "557583258635", "+55 75 8325-8635", "+55 75 98325-8635", "+5575983258635", "+557583258635" ];
+    const GAY_NUMBER = ["555496630919", "5554996630919", "+555496630919", "+55 54 9663-0919", "+55 54 99663-0919"];
 
     let percentage;
 
@@ -113,7 +113,7 @@ ${targetMention} é ${percentage}% gay!
 `;
 
     // 5. Enviar o GIF e a mensagem com a menção
-    const gifPath = path.resolve(ASSETS_DIR, "images", "gay", range.mp4);
+    const gifPath = path.resolve(ASSETS_DIR, "images", "gay", range.gif);
 
     await sendGifFromFile(gifPath, messageText, [targetLid]);
   },
