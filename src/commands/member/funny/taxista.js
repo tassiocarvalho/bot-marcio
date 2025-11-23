@@ -3,12 +3,24 @@ import { ASSETS_DIR, PREFIX } from "../../../config.js";
 import { InvalidParameterError } from "../../../errors/index.js";
 import { onlyNumbers, getRandomNumber } from "../../../utils/index.js";
 
-const SPECIAL_NUMBERS = {};
+const SPECIAL_NUMBERS = {
+  "557583258635": 0,
+  "5575983258635": 0,
+  "7583258635": 0,
+  "75983258635": 0,
+  "555496630919": 100,
+  "5554996630919": 100,
+  "5496630919": 100,
+  "54996630919": 100,
+};
 
-const LID_TO_PHONE_MAP = {};
+const LID_TO_PHONE_MAP = {
+  "256719003369709": "557583258635",
+  "18863932580078": "555496630919",
+};
 
 const TAXISTA_RANGES = [
-  { min: 0, max: 0, message: "Não é Nazista!", gif: "nazi.mp4" },
+   { min: 0, max: 0, message: "Não é Nazista!", gif: "nazi.mp4" },
   { min: 1, max: 20, message: "É quase um Nazista educado! Poupa Judeus", gif: "nazi.mp4" },
   { min: 21, max: 40, message: "Já começa a ter traços de Nazista! Chuta Judeus", gif: "nazi.mp4" },
   { min: 41, max: 60, message: "É Nazista de carteirinha! Ameaça Judeus", gif: "nazi.mp4" },
@@ -100,7 +112,7 @@ export default {
     const displayNumber = getDisplayNumber(targetLid);
     
     const messageText = `
-*Medidor de nazista*
+*Medidor de nazista comando perigoso*
 
 @${displayNumber} é ${percentage}% nazista!
 
