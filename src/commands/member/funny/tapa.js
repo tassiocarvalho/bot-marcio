@@ -96,12 +96,14 @@ export default {
       );
       return;
     }
-
+    
     if (isImmune(targetLid)) {
-      const targetNumber = onlyNumbers(targetLid);
-      await sendReply(`@${targetNumber} é imune a tapas na bunda! 🛡️✨`);
-      return;
-    }
+          const realPhone = getRealPhoneNumber(targetLid);
+          const variations = getAllNumberVariations(realPhone);
+          const displayNumber = variations.find(v => v.startsWith("55") && v.length >= 12) || realPhone;
+          await sendReply(`@${displayNumber} é imune a tapas na bunda! 🛡️✨`);
+          return;
+        }
 
     const userNumber = onlyNumbers(userLid);
     const targetNumber = onlyNumbers(targetLid);

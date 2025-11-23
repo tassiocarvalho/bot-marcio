@@ -94,6 +94,7 @@ export function menuMessage(groupJid) {
 ▢
 ▢ • ${prefix}gay
 ▢ • ${prefix}gostoso
+▢ • ${prefix}tapanabunda
 ▢ • ${prefix}abracar
 ▢ • ${prefix}beijar
 ▢ • ${prefix}dado
