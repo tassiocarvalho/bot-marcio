@@ -63,29 +63,30 @@ import { onlyNumbers } from "../../../utils/index.js";
  * @returns {Array}
  */
 function getRandomElements(array, n) {
-  // Embaralha o array e pega os primeiros N elementos
   const shuffled = array.sort(() => 0.5 - Math.random());
   return shuffled.slice(0, n);
 }
 
 export default {
   name: "listadegados",
-  description: "Seleciona 5 membros aleatórios do grupo e os lista como 'gados'.",
+  description: "BOSTA!!.",
   commands: ["listadegados"],
   usage: `${PREFIX}listadegados`,
 
   /**
    * @param {CommandHandleProps} props
    */
-  handle: async ({ sendReply, participants }) => {
-    // Verifica se há participantes suficientes no grupo
+  handle: async ({ sendReply, socket, remoteJid }) => {
+    const { participants } = await socket.groupMetadata(remoteJid);
+
     if (!participants || participants.length < 5) {
       throw new InvalidParameterError(
-        "EU SOU BURRO"
+        "Este comando só pode ser usado em grupos com pelo menos 5 membros."
       );
     }
 
     // 1. Selecionar 5 membros aleatórios
+    // A lista de participantes do groupMetadata já vem no formato correto { id: '...', admin: '...' }
     const gadosSelecionados = getRandomElements(participants, 5);
 
     // 2. Mapear os LIDs dos membros para a lista de menções
@@ -103,7 +104,7 @@ ${gadosLids
 `;
 
     // 4. Enviar a mensagem com as menções
-    // O objeto { mentions: gadosLids } garante que o WhatsApp renderize as menções corretamente.
+    // O sendReply precisa do array de LIDs para garantir que as menções funcionem.
     await sendReply(mensagem, { mentions: gadosLids });
   },
 };
