@@ -81,25 +81,17 @@ class Ffmpeg {
    * @returns {Promise<string>} Caminho do arquivo MP3 de saída
    */
   async convertToMp3(inputPath) {
-      const outputPath = await this._createTempFilePath("mp3");
-      
-      // Comando corrigido para MP3 real
-      const command = `ffmpeg -i "${inputPath}" -vn -c:a mp3 -b:a 192k "${outputPath}"`;
-      
-      await this._executeCommand(command);
-      
-      // Verifica se o arquivo foi criado com sucesso
-      if (!fs.existsSync(outputPath)) {
-          throw new Error("Falha na conversão para MP3: arquivo de saída não encontrado");
-      }
-      
-      const stats = fs.statSync(outputPath);
-      if (stats.size === 0) {
-          await this.cleanup(outputPath);
-          throw new Error("Arquivo MP3 vazio gerado");
-      }
-      
-      return outputPath;
+    const outputPath = await this._createTempFilePath("mp3");
+    // Comando mais universal: -acodec aac é mais comum que libmp3lame
+    const command = `ffmpeg -i ${inputPath} -vn -acodec aac -b:a 192k ${outputPath}`;
+    await this._executeCommand(command);
+    return outputPath;
+  }
+
+  async cleanup(filePath) {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
   }
 }
 
