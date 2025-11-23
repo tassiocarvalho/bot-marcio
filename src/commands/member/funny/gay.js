@@ -15,31 +15,31 @@ const GAY_RANGES = [
     min: 1,
     max: 25,
     message: "É quase hetero. Ainda há esperança! 🤏",
-    gif: "gintama-gintoki.mp4", // Imagem 2: Quase Hetero
+    gif: "gay_1, // Imagem 2: Quase Hetero
   },
   {
     min: 26,
     max: 49,
     message: "É quase meio gay. Está na dúvida! 🤔",
-    gif: "some-guy-getting-punch-anime-punching-some-guy-anime.mp4", // Imagem 3: Quase Meio Gay
+    gif: "gay_2", // Imagem 3: Quase Meio Gay
   },
   {
     min: 50,
     max: 75,
     message: "É gay. Orgulho! 🏳️‍🌈",
-    gif: "hug-darker-than-black.mp4", // Imagem 4: Gay
+    gif: "gay_3", // Imagem 4: Gay
   },
   {
     min: 76,
     max: 99,
     message: "É gayzão! Não tem mais volta! 🌈",
-    gif: "kiss.mp4", // Imagem 5: Gayzão
+    gif: "gay_4", // Imagem 5: Gayzão
   },
   {
     min: 100,
     max: 100,
     message: "É o gay mais gay da terra! 👑",
-    gif: "yumeko-mirai-nikki.mp4", // Imagem 6: 100% Gay
+    gif: "gay_5", // Imagem 6: 100% Gay
   },
 ];
 
@@ -78,16 +78,30 @@ export default {
       return;
     }
 
-    // 2. Gerar porcentagem aleatória (0 a 100)
-    const percentage = getRandomNumber(0, 100);
+    // 2. Normalizar o número do alvo para comparação
+    const targetNumber = onlyNumbers(targetLid);
 
-    // 3. Encontrar a faixa correspondente
+    // 3. Definir as exceções
+    const HETERO_NUMBER = "5575983258635";
+    const GAY_NUMBER = "555496630919";
+
+    let percentage;
+
+    if (targetNumber === HETERO_NUMBER) {
+      percentage = 0;
+    } else if (targetNumber === GAY_NUMBER) {
+      percentage = 100;
+    } else {
+      // Gerar porcentagem aleatória (0 a 100)
+      percentage = getRandomNumber(0, 100);
+    }
+
+    // 4. Encontrar a faixa correspondente
     const range = GAY_RANGES.find(
       (r) => percentage >= r.min && percentage <= r.max
     );
 
-    // 4. Construir a mensagem
-    const targetNumber = targetLid.split("@")[0];
+    // 5. Construir a mensagem
     const targetMention = `@${targetNumber}`;
 
     const messageText = `
