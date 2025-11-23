@@ -76,61 +76,30 @@ class Ffmpeg {
 
   /**
    * Converte um arquivo de áudio para MP3.
-   * Usa o codec libmp3lame para gerar MP3 real.
-   * @param {string} inputPath Caminho do arquivo de entrada (ex: .webm, .m4a, .opus)
+   * Usa o codec aac e bitrate fixo para maior compatibilidade.
+   * @param {string} inputPath Caminho do arquivo de entrada (ex: .webm, .m4a)
    * @returns {Promise<string>} Caminho do arquivo MP3 de saída
    */
   async convertToMp3(inputPath) {
-    const outputPath = await this._createTempFilePath("mp3");
-    
-    // Opções otimizadas para MP3:
-    // -i: arquivo de entrada
-    // -vn: remove vídeo (só áudio)
-    // -acodec libmp3lame: codec MP3
-    // -b:a 192k: bitrate de áudio (qualidade boa)
-    // -ar 44100: sample rate padrão
-    // -ac 2: 2 canais (estéreo)
-    const command = `ffmpeg -i "${inputPath}" -vn -acodec libmp3lame -b:a 192k -ar 44100 -ac 2 "${outputPath}"`;
-    
-    await this._executeCommand(command);
-    return outputPath;
-  }
-
-  /**
-   * Alternativa: Converte para M4A (AAC) caso libmp3lame não esteja disponível
-   * @param {string} inputPath Caminho do arquivo de entrada
-   * @returns {Promise<string>} Caminho do arquivo M4A de saída
-   */
-  async convertToM4a(inputPath) {
-    const outputPath = await this._createTempFilePath("m4a");
-    const command = `ffmpeg -i "${inputPath}" -vn -acodec aac -b:a 192k "${outputPath}"`;
-    await this._executeCommand(command);
-    return outputPath;
-  }
-
-  /**
-   * Converte áudio com fallback automático
-   * Tenta MP3 primeiro, se falhar tenta M4A
-   * @param {string} inputPath Caminho do arquivo de entrada
-   * @returns {Promise<{path: string, format: string}>} Caminho e formato do arquivo
-   */
-  async convertAudio(inputPath) {
-    try {
-      // Tenta converter para MP3 primeiro
-      const mp3Path = await this.convertToMp3(inputPath);
-      return { path: mp3Path, format: "mp3" };
-    } catch (error) {
-      errorLog("Falha ao converter para MP3, tentando M4A...");
-      // Se falhar, usa M4A como fallback
-      const m4aPath = await this.convertToM4a(inputPath);
-      return { path: m4aPath, format: "m4a" };
-    }
-  }
-
-  async cleanup(filePath) {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+      const outputPath = await this._createTempFilePath("mp3");
+      
+      // Comando corrigido para MP3 real
+      const command = `ffmpeg -i "${inputPath}" -vn -c:a mp3 -b:a 192k "${outputPath}"`;
+      
+      await this._executeCommand(command);
+      
+      // Verifica se o arquivo foi criado com sucesso
+      if (!fs.existsSync(outputPath)) {
+          throw new Error("Falha na conversão para MP3: arquivo de saída não encontrado");
+      }
+      
+      const stats = fs.statSync(outputPath);
+      if (stats.size === 0) {
+          await this.cleanup(outputPath);
+          throw new Error("Arquivo MP3 vazio gerado");
+      }
+      
+      return outputPath;
   }
 }
 
