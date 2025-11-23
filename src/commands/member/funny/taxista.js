@@ -8,13 +8,13 @@ const SPECIAL_NUMBERS = {};
 const LID_TO_PHONE_MAP = {};
 
 const TAXISTA_RANGES = [
-  { min: 0, max: 0, message: "Não é Nazista!", gif: "hug-darker-than-black.mp4" },
-  { min: 1, max: 20, message: "É quase um Nazista educado!", gif: "hug-darker-than-black.mp4" },
-  { min: 21, max: 40, message: "Já começa a ter traços de Nazista!", gif: "hug-darker-than-black.mp4" },
-  { min: 41, max: 60, message: "É Nazista de carteirinha!", gif: "thug-darker-than-black.mp4" },
-  { min: 61, max: 80, message: "É Nazista raiz! Perigoso", gif: "hug-darker-than-black.mp4" },
-  { min: 81, max: 99, message: "É o rei dos Naxistas! 👑🚖", gif: "hug-darker-than-black.mp4" },
-  { min: 100, max: 100, message: "É O NAZISTA SUPREMO!!", gif: "hug-darker-than-black.mp4" },
+  { min: 0, max: 0, message: "Não é Nazista!", gif: "nazi.mp4" },
+  { min: 1, max: 20, message: "É quase um Nazista educado! Poupa Judeus", gif: "nazi.mp4" },
+  { min: 21, max: 40, message: "Já começa a ter traços de Nazista! Chuta Judeus", gif: "nazi.mp4" },
+  { min: 41, max: 60, message: "É Nazista de carteirinha! Ameaça Judeus", gif: "nazi.mp4" },
+  { min: 61, max: 80, message: "É Nazista raiz! Perigoso Assassina Judeus", gif: "nazi.mp4" },
+  { min: 81, max: 99, message: "É o rei dos Nazistas! Amigo de Hitler", gif: "nazi.mp4" },
+  { min: 100, max: 100, message: "É O NAZISTA SUPREMO!! Sentando no colo do capeta", gif: "nazi.mp4" },
 ];
 
 function getRealPhoneNumber(lid) {
@@ -107,7 +107,7 @@ export default {
 *Resultado:* ${range.message}
 `;
 
-    const gifPath = path.resolve(ASSETS_DIR, "images", "funny", range.gif);
+    const gifPath = path.resolve(ASSETS_DIR, "images", "gay", range.gif);
     await sendGifFromFile(gifPath, messageText, [targetLid]);
   },
 };
