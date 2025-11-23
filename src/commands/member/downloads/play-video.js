@@ -5,7 +5,7 @@ import { play } from "../../../services/spider-x-api.js";
 export default {
   name: "play-video",
   description: "Faço o download de vídeos",
-  commands: ["play-video", "pv"],
+  //commands: ["play-video", "pv"],
   usage: `${PREFIX}play-video MC Hariel`,
   /**
    * @param {CommandHandleProps} props

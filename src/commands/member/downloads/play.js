@@ -8,7 +8,7 @@ import path from "node:path";
 import { TEMP_DIR } from "../../../config.js";
 
 export default {
-  name: "play-new",
+  name: "play",
   description: "Pesquisa e envia o áudio de um vídeo do YouTube",
   commands: ["play"],
   usage: `${PREFIX}play galinha pintadinha`,
