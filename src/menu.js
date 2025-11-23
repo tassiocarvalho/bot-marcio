@@ -99,6 +99,7 @@ export function menuMessage(groupJid) {
 ▢ • ${prefix}lutar
 ▢ • ${prefix}matar
 ▢ • ${prefix}socar
+▢ • ${prefix}listadegados
 ▢
 ╰━━─「🎡」─━━`;
 };
