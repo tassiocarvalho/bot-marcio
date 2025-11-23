@@ -9,9 +9,9 @@ import { TEMP_DIR } from "../../../config.js";
 import { unlink } from "node:fs/promises";
 
 export default {
-  name: "play",
+  //name: "play",
   description: "Pesquisa e envia o áudio de um vídeo do YouTube",
-  commands: ["play", "pa"],
+  //commands: ["play", "pa"],
   usage: `${PREFIX}play galinha pintadinha`,
   /**
    * @param {CommandHandleProps} props
