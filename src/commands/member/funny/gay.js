@@ -3,13 +3,17 @@ import { ASSETS_DIR, PREFIX } from "../../../config.js";
 import { InvalidParameterError } from "../../../errors/index.js";
 import { onlyNumbers, getRandomNumber } from "../../../utils/index.js";
 
-// Configurações de números especiais (fácil de adicionar mais)
 const SPECIAL_NUMBERS = {
-  "557583258635": 0,   // Sempre hetero
-  "555496630919": 100, // Sempre gay
+  "557583258635": 0,
+  "5575983258635": 0,
+  "7583258635": 0,
+  "75983258635": 0,
+  "555496630919": 100,
+  "5554996630919": 100,
+  "5496630919": 100,
+  "54996630919": 100,
 };
 
-// Mapeamento de faixas de porcentagem para mensagens e GIFs
 const GAY_RANGES = [
   { min: 0, max: 0, message: "É 100% hetero! 🚫", gif: "hetero.mp4" },
   { min: 1, max: 25, message: "É quase hetero. Ainda há esperança! 🤏", gif: "gay_1.mp4" },
@@ -19,31 +23,49 @@ const GAY_RANGES = [
   { min: 100, max: 100, message: "É o gay mais gay da terra! 👑", gif: "gay_5.mp4" },
 ];
 
-/**
- * Normaliza número brasileiro adicionando DDI 55 se necessário
- */
-function normalizePhoneNumber(lid) {
+function getAllNumberVariations(lid) {
   let number = onlyNumbers(lid);
+  const variations = new Set();
   
-  // Se tem 10 ou 11 dígitos e não começa com 55, adiciona o DDI
-  if ((number.length === 10 || number.length === 11) && !number.startsWith("55")) {
-    number = "55" + number;
+  variations.add(number);
+  
+  if (!number.startsWith("55") && (number.length === 10 || number.length === 11)) {
+    variations.add("55" + number);
   }
   
-  return number;
+  if (number.startsWith("55") && number.length >= 12) {
+    variations.add(number.substring(2));
+  }
+  
+  const allVariations = Array.from(variations);
+  allVariations.forEach(variant => {
+    if (variant.length === 11 && variant.charAt(2) === "9") {
+      variations.add(variant.substring(0, 2) + variant.substring(3));
+    }
+    if (variant.length === 13 && variant.startsWith("55") && variant.charAt(4) === "9") {
+      variations.add(variant.substring(0, 4) + variant.substring(5));
+    }
+  });
+  
+  return Array.from(variations);
 }
 
-/**
- * Calcula a porcentagem gay do usuário
- */
-function calculateGayPercentage(normalizedNumber) {
-  // Verifica se é um número especial
-  if (normalizedNumber in SPECIAL_NUMBERS) {
-    return SPECIAL_NUMBERS[normalizedNumber];
+function calculateGayPercentage(lid) {
+  const variations = getAllNumberVariations(lid);
+  
+  for (const variant of variations) {
+    if (variant in SPECIAL_NUMBERS) {
+      return SPECIAL_NUMBERS[variant];
+    }
   }
   
-  // Caso contrário, gera aleatoriamente
   return getRandomNumber(0, 100);
+}
+
+function getDisplayNumber(lid) {
+  const variations = getAllNumberVariations(lid);
+  const withDDI = variations.find(v => v.startsWith("55") && v.length >= 12);
+  return withDDI || variations[0];
 }
 
 export default {
@@ -53,14 +75,12 @@ export default {
   usage: `${PREFIX}gay @usuario ou respondendo a mensagem`,
   
   handle: async ({ sendGifFromFile, sendErrorReply, replyLid, args, isReply }) => {
-    // 1. Validar entrada
     if (!args.length && !isReply) {
       throw new InvalidParameterError(
         "Você precisa mencionar ou marcar um membro para calcular a porcentagem gay!"
       );
     }
 
-    // 2. Identificar o alvo
     const targetLid = isReply ? replyLid : args[0] ? `${onlyNumbers(args[0])}@lid` : null;
 
     if (!targetLid) {
@@ -70,19 +90,14 @@ export default {
       return;
     }
 
-    // 3. Normalizar número e calcular porcentagem
-    const normalizedNumber = normalizePhoneNumber(targetLid);
-    const percentage = calculateGayPercentage(normalizedNumber);
-
-    // 4. Encontrar a faixa correspondente
+    const percentage = calculateGayPercentage(targetLid);
     const range = GAY_RANGES.find(r => percentage >= r.min && percentage <= r.max);
-
-    // 5. Construir e enviar resposta
-    const targetMention = `@${normalizedNumber}`;
+    const displayNumber = getDisplayNumber(targetLid);
+    
     const messageText = `
 *Calculadora Gay* 🏳️‍🌈
 
-${targetMention} é ${percentage}% gay!
+@${displayNumber} é ${percentage}% gay!
 
 *Resultado:* ${range.message}
 `;
