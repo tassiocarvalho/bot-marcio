@@ -15,31 +15,31 @@ const GAY_RANGES = [
     min: 1,
     max: 25,
     message: "É quase hetero. Ainda há esperança! 🤏",
-    gif: "gay_1, // Imagem 2: Quase Hetero
+    gif: "gay_1.gif", // Imagem 2: Quase Hetero
   },
   {
     min: 26,
     max: 49,
     message: "É quase meio gay. Está na dúvida! 🤔",
-    gif: "gay_2", // Imagem 3: Quase Meio Gay
+    gif: "gay_2.gif", // Imagem 3: Quase Meio Gay
   },
   {
     min: 50,
     max: 75,
     message: "É gay. Orgulho! 🏳️‍🌈",
-    gif: "gay_3", // Imagem 4: Gay
+    gif: "gay_3.gif", // Imagem 4: Gay
   },
   {
     min: 76,
     max: 99,
     message: "É gayzão! Não tem mais volta! 🌈",
-    gif: "gay_4", // Imagem 5: Gayzão
+    gif: "gay_4.gif", // Imagem 5: Gayzão
   },
   {
     min: 100,
     max: 100,
     message: "É o gay mais gay da terra! 👑",
-    gif: "gay_5", // Imagem 6: 100% Gay
+    gif: "gay_5.gif", // Imagem 6: 100% Gay
   },
 ];
 
