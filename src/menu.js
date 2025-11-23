@@ -101,6 +101,7 @@ export function menuMessage(groupJid) {
 ▢ • ${prefix}matar
 ▢ • ${prefix}socar
 ▢ • ${prefix}listadegados
+▢ • ${prefix}nazista
 ▢
 ╰━━─「🎡」─━━`;
 };

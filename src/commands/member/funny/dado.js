@@ -54,7 +54,7 @@ export default {
     } else {
       await sendReact("😭");
       await sendReply(
-        `💥 *${pushName} PERDEU...* Você apostou no *${number}* mas o dado caiu em *${result}*! Tente novamente.`
+        `💥 *${pushName} PERDEU...* Você apostou no *${number}* mas o dado caiu em *${result}*! *COM TODA CERTEZA VOCÊ TEM DADO EM CASA*`
       );
     }
   },

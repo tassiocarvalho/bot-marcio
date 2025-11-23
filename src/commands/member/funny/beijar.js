@@ -5,7 +5,7 @@ import { onlyNumbers } from "../../../utils/index.js";
 
 export default {
   name: "beijar",
-  description: "Beija um usuário que você ama.",
+  description: "Beija uma pessoa gostosa que você tanto quer.",
   commands: ["beijar", "beija", "beijo", "kiss"],
   usage: `${PREFIX}beijar @usuario`,
   /**
@@ -44,7 +44,7 @@ export default {
 
     await sendGifFromFile(
       path.resolve(ASSETS_DIR, "images", "funny", "kiss.mp4"),
-      `@${userNumber} beijou @${targetNumber}!`,
+      `@${userNumber} beijou gostoso até molhar @${targetNumber}!`,
       [userLid, targetLid]
     );
   },
