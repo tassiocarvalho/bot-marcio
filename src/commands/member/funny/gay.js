@@ -57,6 +57,7 @@ export default {
     replyLid,
     args,
     isReply,
+    mentionedLid,
   }) => {
     if (!args.length && !isReply) {
       throw new InvalidParameterError(
@@ -65,7 +66,10 @@ export default {
     }
 
     // 1. Identificar o alvo (LID)
-    const targetLid = isReply
+    // Prioridade: 1. Menção na mensagem, 2. Resposta, 3. Argumento (fallback)
+    const targetLid = mentionedLid
+      ? mentionedLid
+      : isReply
       ? replyLid
       : args[0]
       ? `${onlyNumbers(args[0])}@lid`
@@ -95,7 +99,7 @@ export default {
     }
 
     // 3. Definir as exceções
-    const HETERO_NUMBER = "557583258635";
+    const HETERO_NUMBER = "5575983258635";
     const GAY_NUMBER = "555496630919";
 
     let percentage;
@@ -126,7 +130,7 @@ ${targetMention} é ${percentage}% gay!
 `;
 
     // 5. Enviar o GIF e a mensagem com a menção
-    const gifPath = path.resolve(ASSETS_DIR, "images", "gay", range.gif);
+    const gifPath = path.resolve(ASSETS_DIR, "images", "funny", range.gif);
 
     await sendGifFromFile(gifPath, messageText, [targetLid]);
   },
