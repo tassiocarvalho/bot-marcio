@@ -10,12 +10,19 @@ import { Ffmpeg } from "../../../services/ffmpeg.js";
 import fs from "node:fs";
 
 // Função auxiliar para ler cookies
+// Função auxiliar para ler cookies
 function getYoutubeCookies() {
   const cookiesPath = path.resolve(process.cwd(), "database", "youtube_cookies.json");
   if (fs.existsSync(cookiesPath)) {
     try {
       // Lê o conteúdo como texto puro, remove espaços em branco e quebras de linha
-      const cookies = fs.readFileSync(cookiesPath, "utf-8").trim();
+      let cookies = fs.readFileSync(cookiesPath, "utf-8").trim();
+      
+      // CORREÇÃO: Remove as aspas externas se o formato for JSON String
+      if (cookies.startsWith('"') && cookies.endsWith('"')) {
+          cookies = cookies.substring(1, cookies.length - 1);
+      }
+      
       // Verifica se o arquivo não está vazio
       if (cookies.length > 0) {
         return cookies;
