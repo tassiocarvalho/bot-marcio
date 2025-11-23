@@ -69,7 +69,9 @@ export default {
       console.error("Erro ao criar Innertube:", error);
       throw new WarningError("Não foi possível conectar ao YouTube. Tente novamente mais tarde.");
     }
-
+    if (!searchResults || !searchResults.videos || !searchResults.videos.length) {
+    throw new WarningError("Nenhum vídeo encontrado para sua pesquisa.");
+    }
     let video;
     try {
       const searchResults = await innertube.search(fullArgs, {
