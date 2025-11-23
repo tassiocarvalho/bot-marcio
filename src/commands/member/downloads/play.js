@@ -10,7 +10,6 @@ import { Ffmpeg } from "../../../services/ffmpeg.js";
 import fs from "node:fs";
 
 // Função auxiliar para ler cookies
-// Função auxiliar para ler cookies
 function getYoutubeCookies() {
   const cookiesPath = path.resolve(process.cwd(), "database", "youtube_cookies.json");
   if (fs.existsSync(cookiesPath)) {
@@ -69,16 +68,15 @@ export default {
       console.error("Erro ao criar Innertube:", error);
       throw new WarningError("Não foi possível conectar ao YouTube. Tente novamente mais tarde.");
     }
-    if (!searchResults || !searchResults.videos || !searchResults.videos.length) {
-    throw new WarningError("Nenhum vídeo encontrado para sua pesquisa.");
-    }
+
     let video;
+    let searchResults; // CORRIGIDO: Declarado aqui para escopo correto
     try {
-      const searchResults = await innertube.search(fullArgs, {
+      searchResults = await innertube.search(fullArgs, {
         type: "video",
       });
 
-      if (!searchResults.videos.length) {
+      if (!searchResults || !searchResults.videos || !searchResults.videos.length) {
         throw new WarningError("Nenhum vídeo encontrado para sua pesquisa.");
       }
 
