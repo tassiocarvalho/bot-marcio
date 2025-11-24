@@ -101,6 +101,7 @@ export function menuMessage(groupJid) {
 ▢ • ${prefix}gay
 ▢ • ${prefix}gostoso
 ▢ • ${prefix}tapanabunda
+▢ • ${prefix}casar
 ▢ • ${prefix}abracar
 ▢ • ${prefix}beijar
 ▢ • ${prefix}dado
