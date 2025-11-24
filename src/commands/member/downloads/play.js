@@ -16,91 +16,133 @@ const exec = promisify(execChild);
 
 export default {
   name: "play",
-  description: "Baixa música do YouTube e envia como MP3.",
+  description: "Baixa música do YouTube como MP3.",
   commands: ["play"],
   usage: `${PREFIX}play <nome da música>`,
 
-  handle: async ({ sock, msg, args }) => {
-    // === Verificação ===
+  handle: async (props) => {
+    console.log("\n\n===== [DEBUG /play] PROPS RECEBIDOS =====");
+    console.log(props);
+    console.log("=========================================\n\n");
+
+    // Extração segura dos props
+    const {
+      args,
+      sock,
+      msg,
+      sendTextReply,
+      sendWaitReact,
+      sendSuccessReact,
+      sendFileReply,
+    } = props;
+
+    // DEBUG individual
+    console.log("[DEBUG] args:", args);
+    console.log("[DEBUG] sock existe?", !!sock);
+    console.log("[DEBUG] msg existe?", !!msg);
+    console.log("[DEBUG] sendTextReply existe?", !!sendTextReply);
+    console.log("[DEBUG] sendWaitReact existe?", !!sendWaitReact);
+    console.log("[DEBUG] sendSuccessReact existe?", !!sendSuccessReact);
+    console.log("[DEBUG] sendFileReply existe?", !!sendFileReply);
+
     if (!args || !args.length) {
+      console.log("[DEBUG] Nenhum argumento recebido");
       throw new InvalidParameterError("Você precisa informar o nome da música!");
     }
 
     const query = args.join(" ");
+    console.log("[DEBUG] Consulta YT:", query);
 
-    // Reação de carregando
-    await sock.sendMessage(msg.from, { react: { text: "⏳", key: msg.key } });
+    // Testa função (gera erro se estiver undefined)
+    try {
+      console.log("[DEBUG] Testando sendWaitReact()");
+      await sendWaitReact();
+    } catch (err) {
+      console.log("[ERRO] sendWaitReact FALHOU:", err);
+    }
 
     let info;
     try {
+      console.log("[DEBUG] Fazendo busca no yt-search…");
       const search = await yts(query);
 
+      console.log("[DEBUG] Resultados encontrados:", search.videos.length);
+
       if (!search.videos.length) {
-        return sock.sendMessage(msg.from, {
-          text: "❌ Nenhum resultado encontrado no YouTube."
-        });
+        console.log("[DEBUG] Nenhum vídeo encontrado");
+        return sendTextReply("❌ Nenhum resultado encontrado no YouTube.");
       }
 
       info = search.videos[0];
+      console.log("[DEBUG] Vídeo selecionado:", info);
     } catch (e) {
-      console.error(e);
-      return sock.sendMessage(msg.from, {
-        text: "❌ Erro ao pesquisar no YouTube."
-      });
+      console.error("[ERRO] yt-search falhou:", e);
+      return sendTextReply("❌ Erro ao pesquisar no YouTube.");
     }
 
-    // Envia mensagem com a prévia
-    await sock.sendMessage(msg.from, {
-      text:
+    // Mensagem inicial
+    try {
+      console.log("[DEBUG] Enviando mensagem inicial...");
+      await sendTextReply(
         `🎵 *Resultado encontrado:*\n\n` +
-        `📌 *Título:* ${info.title}\n` +
-        `👤 *Canal:* ${info.author.name}\n` +
-        `⏱️ *Duração:* ${info.timestamp}\n` +
-        `🔗 https://youtube.com/watch?v=${info.videoId}\n\n` +
-        `⏳ Baixando e convertendo para MP3...`
-    });
+          `📌 *Título:* ${info.title}\n` +
+          `👤 *Canal:* ${info.author.name}\n` +
+          `⏱️ *Duração:* ${info.timestamp}\n` +
+          `🔗 https://youtube.com/watch?v=${info.videoId}\n\n` +
+          `⏳ Baixando e convertendo para MP3...`
+      );
+    } catch (err) {
+      console.log("[ERRO] sendTextReply falhou:", err);
+    }
 
     const videoUrl = info.url;
     const tempInput = path.join(TEMP_DIR, getRandomName("webm"));
     const tempOutput = path.join(TEMP_DIR, getRandomName("mp3"));
 
+    console.log("[DEBUG] Temp input:", tempInput);
+    console.log("[DEBUG] Temp output:", tempOutput);
+
     try {
-      // === 1) Baixa o áudio com yt-dlp
+      console.log("[DEBUG] Iniciando download via yt-dlp…");
+
       await ytDlp(videoUrl, {
         output: tempInput,
         extractAudio: false,
-        quiet: true,
+        quiet: false,
       });
 
-      // === 2) Converte para MP3 via FFmpeg
+      console.log("[DEBUG] Download concluído.");
+
+      console.log("[DEBUG] Convertendo para MP3…");
       await exec(`ffmpeg -y -i "${tempInput}" -vn -ab 192k "${tempOutput}"`);
 
+      console.log("[DEBUG] ffmpeg terminou.");
+
       if (!fs.existsSync(tempOutput)) {
-        throw new Error("Falha na conversão.");
+        throw new Error("Conversão falhou (arquivo não existe).");
       }
 
-      // Reação de sucesso
-      await sock.sendMessage(msg.from, {
-        react: { text: "✅", key: msg.key }
-      });
+      console.log("[DEBUG] Enviando reação de sucesso");
+      await sendSuccessReact();
 
-      // === 3) Envia arquivo MP3
-      await sock.sendMessage(msg.from, {
-        document: fs.readFileSync(tempOutput),
-        mimetype: "audio/mpeg",
-        fileName: `${info.title}.mp3`
-      });
+      console.log("[DEBUG] Enviando arquivo MP3...");
+      await sendFileReply(tempOutput, `${info.title}.mp3`);
+
+      console.log("[DEBUG] MP3 enviado com sucesso!");
     } catch (err) {
-      console.error("Erro em /play:", err);
-
-      return sock.sendMessage(msg.from, {
-        text: "❌ Ocorreu um erro ao baixar ou converter o áudio."
-      });
-
+      console.error("[ERRO] Processo /play falhou:", err);
+      return sendTextReply("❌ Ocorreu um erro ao baixar ou converter o áudio.");
     } finally {
-      // Limpa arquivos temporários
-      if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
-      if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
+      console.log("[DEBUG] Limpando arquivos temporários…");
+
+      if (fs.existsSync(tempInput)) {
+        fs.unlinkSync(tempInput);
+        console.log("[DEBUG] tempInput apagado");
+      }
+      if (fs.existsSync(tempOutput)) {
+        fs.unlinkSync(tempOutput);
+        console.log("[DEBUG] tempOutput apagado");
+      }
     }
   },
 };
