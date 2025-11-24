@@ -9,255 +9,46 @@ import fs from "node:fs";
 import path from "node:path";
 import https from "node:https";
 import { exec as execChild } from "node:child_process";
-import { promisify } from "node:util";
-import { PREFIX, TEMP_DIR } from "../../../config.js";
+import { promisify } from "node:util"; "../../../config.js";
 import { getRandomName } from "../../../utils/index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const COOKIES_PATH = path.join(__dirname, "youtube_cookies.txt");
 
 const exec = promisify(execChild);
 
 // ============================================
-// SISTEMA DE PROXIES
+// SISTEMA DE DOWNLOAD SIMPLIFICADO (via Python)
 // ============================================
 
-let PROXY_CACHE = null;
-let PROXY_CACHE_TIME = 0;
-const PROXY_CACHE_DURATION = 6 * 60 * 60 * 1000; // 6 horas
-
-// Fontes de proxies SOCKS5 gratuitos
-const PROXY_SOURCES = [
-  "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=socks5&timeout=10000&country=all",
-  "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt",
-  "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks5.txt"
-];
-
-// Proxies padrão (fallback caso as fontes falhem)
-const DEFAULT_PROXIES = [
-  "socks5://167.99.109.153:1080",
-  "socks5://192.111.139.165:4145",
-  "socks5://98.162.25.23:4145",
-  "socks5://72.195.34.59:4145",
-  "socks5://184.178.172.25:15291"
-];
-
-// Busca proxies de uma URL
-function fetchProxiesFromUrl(url) {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error("Timeout"));
-    }, 10000);
-
-    https.get(url, (res) => {
-      let data = "";
-      
-      res.on("data", (chunk) => {
-        data += chunk;
-      });
-      
-      res.on("end", () => {
-        clearTimeout(timeout);
-        const proxies = data
-          .split("\n")
-          .map(line => line.trim())
-          .filter(line => line && !line.startsWith("#"))
-          .filter(line => /^\d+\.\d+\.\d+\.\d+:\d+$/.test(line))
-          .map(proxy => `socks5://${proxy}`);
-        
-        resolve(proxies);
-      });
-    }).on("error", (err) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
-  });
-}
-
-// Busca e atualiza lista de proxies
-async function fetchFreshProxies() {
-  console.log("[PROXY] Buscando proxies atualizados...");
-  const allProxies = new Set(DEFAULT_PROXIES);
-
-  for (const source of PROXY_SOURCES) {
-    try {
-      const proxies = await fetchProxiesFromUrl(source);
-      proxies.slice(0, 20).forEach(p => allProxies.add(p));
-      console.log(`[PROXY] ✓ ${proxies.length} proxies de ${source.split("/")[2]}`);
-    } catch (err) {
-      console.log(`[PROXY] ✗ Falhou: ${source.split("/")[2]}`);
-    }
-  }
-
-  const proxyArray = Array.from(allProxies);
-  console.log(`[PROXY] Total: ${proxyArray.length} proxies`);
-  return proxyArray;
-}
-
-// Obtém lista de proxies (usa cache se disponível)
-async function getProxyList() {
-  const now = Date.now();
+/**
+ * Tenta fazer download do áudio do YouTube como MP3 usando um script Python.
+ * @param {string} videoUrl URL do vídeo do YouTube.
+ * @param {string} outputPath Caminho base para o arquivo de saída (sem extensão).
+ * @returns {Promise<string|null>} Caminho completo do arquivo MP3 ou null em caso de falha.
+ */
+async function downloadMp3(videoUrl, outputPath) {
+  const pythonScriptPath = path.join(__dirname, "../../../services/yt_download.py");
   
-  if (PROXY_CACHE && (now - PROXY_CACHE_TIME) < PROXY_CACHE_DURATION) {
-    console.log("[PROXY] Usando cache de proxies");
-    return PROXY_CACHE;
-  }
-
+  console.log("[DOWNLOAD] Iniciando download via script Python...");
+  
+  const command = `python3 ${pythonScriptPath} "${videoUrl}" "${outputPath}"`;
+  
   try {
-    PROXY_CACHE = await fetchFreshProxies();
-    PROXY_CACHE_TIME = now;
-    return PROXY_CACHE;
+    const { stdout } = await exec(command, { timeout: 120000 }); // 2 minutos de timeout
+    
+    const result = JSON.parse(stdout.trim());
+    
+    if (result.success && fs.existsSync(result.path)) {
+      console.log(`[DOWNLOAD] ✓ Sucesso! Arquivo: ${result.path}`);
+      return result.path;
+    } else {
+      console.error(`[DOWNLOAD] ✗ Falha no script Python: ${result.error}`);
+      return null;
+    }
   } catch (err) {
-    console.error("[PROXY] Erro ao buscar proxies, usando padrões:", err.message);
-    return DEFAULT_PROXIES;
+    console.error(`[DOWNLOAD] ✗ Erro ao executar script Python: ${err.message}`);
+    return null;
   }
-}
-
-// Testa se um proxy está funcionando
-async function testProxy(proxy) {
-  try {
-    const cmd = `timeout 8 yt-dlp --proxy "${proxy}" --no-warnings --skip-download --get-title "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1`;
-    await exec(cmd);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// Encontra o melhor proxy disponível
-async function getBestProxy() {
-  const proxies = await getProxyList();
-  console.log(`[PROXY] Testando até 5 proxies...`);
-  
-  for (let i = 0; i < Math.min(5, proxies.length); i++) {
-    const proxy = proxies[i];
-    console.log(`[PROXY] Testando [${i + 1}/5]: ${proxy.substring(0, 30)}...`);
-    
-    const works = await testProxy(proxy);
-    
-    if (works) {
-      console.log(`[PROXY] ✓ Proxy selecionado!`);
-      return proxy;
-    }
-  }
-  
-  console.log("[PROXY] Nenhum proxy disponível");
-  return null;
-}
-
-// ============================================
-// SISTEMA DE DOWNLOAD
-// ============================================
-
-// Estratégias de download do YouTube
-const DOWNLOAD_STRATEGIES = [
-  {
-    name: "android_music",
-    args: [
-      '-f bestaudio',
-      '--extractor-args "youtube:player_client=android_music"',
-      '--no-check-certificate',
-      '--geo-bypass'
-    ]
-  },
-  {
-    name: "mediaconnect",
-    args: [
-      '-f bestaudio',
-      '--extractor-args "youtube:player_client=mediaconnect"',
-      '--no-check-certificate'
-    ]
-  },
-  {
-    name: "mweb",
-    args: [
-      '-f bestaudio',
-      '--extractor-args "youtube:player_client=mweb"',
-      '--user-agent "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36"'
-    ]
-  },
-  {
-    name: "web_embed",
-    args: [
-      '-f bestaudio',
-      '--extractor-args "youtube:player_skip=webpage,configs"',
-      '--no-check-certificate'
-    ]
-  }
-];
-
-// Tenta fazer download com diferentes estratégias
-async function tryDownload(videoUrl, outputPath, useProxy = true) {
-  let proxy = null;
-
-  // Verifica se os cookies existem
-  const hasCookies = fs.existsSync(COOKIES_PATH);
-  console.log(`[DOWNLOAD] Cookies encontrados? ${hasCookies} -> ${COOKIES_PATH}`);
-
-  if (useProxy) {
-    try {
-      proxy = await getBestProxy();
-    } catch (err) {
-      console.log("[DOWNLOAD] Erro ao obter proxy:", err.message);
-    }
-  }
-
-  for (let i = 0; i < DOWNLOAD_STRATEGIES.length; i++) {
-    const strategy = DOWNLOAD_STRATEGIES[i];
-    
-    console.log(`[DOWNLOAD] Tentativa ${i + 1}/${DOWNLOAD_STRATEGIES.length}: ${strategy.name}${proxy ? ' + proxy' : ''}${hasCookies ? ' + cookies' : ''}`);
-
-    const baseArgs = [
-      '--no-cache-dir',
-      '--force-ipv4',
-      '--extractor-retries 3',
-      '--fragment-retries 3',
-      '--no-warnings',
-      '--no-check-formats',
-      '--socket-timeout 30',
-      '--quiet',
-      '--no-progress'
-    ];
-
-    if (proxy) {
-      baseArgs.push(`--proxy "${proxy}"`);
-    }
-
-    if (fs.existsSync(COOKIES_PATH)) { 
-        baseArgs.push(`--cookies "${COOKIES_PATH}"`);
-    }
-
-    const ytDlpCommand = [
-      'yt-dlp',
-      ...strategy.args,
-      ...baseArgs,
-      `-o "${outputPath}"`,
-      `"${videoUrl}"`
-    ].join(' ');
-
-    try {
-      await exec(ytDlpCommand, { timeout: 90000 });
-
-      if (fs.existsSync(outputPath)) {
-        console.log(`[DOWNLOAD] ✓ Sucesso com ${strategy.name}!`);
-        return true;
-      }
-    } catch (err) {
-      console.error(`[DOWNLOAD] ✗ ${strategy.name} falhou: ${err.message}`);
-
-      // Se falhou com todas estratégias + proxy, tenta sem proxy
-      if (proxy && i === DOWNLOAD_STRATEGIES.length - 1) {
-        console.log("[DOWNLOAD] Tentando novamente SEM proxy...");
-        return tryDownload(videoUrl, outputPath, false);
-      }
-
-      if (i < DOWNLOAD_STRATEGIES.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
-  }
-
-  return false;
 }
 
 
@@ -311,35 +102,24 @@ export default {
     );
 
     const videoUrl = info.url;
-    const tempInput = path.join(TEMP_DIR, getRandomName("webm"));
-    const tempOutput = path.join(TEMP_DIR, getRandomName("mp3"));
+const tempOutputBase = path.join(TEMP_DIR, getRandomName("audio"));
 
     try {
-      // Download
-      console.log("[PLAY] Iniciando download...");
-      const downloadSuccess = await tryDownload(videoUrl, tempInput, true);
+      // Download e Conversão (tudo em um no script Python)
+      const tempOutputPath = await downloadMp3(videoUrl, tempOutputBase);
 
-      if (!downloadSuccess) {
+      if (!tempOutputPath) {
         console.error("[PLAY] Download falhou completamente");
         return sendErrorReply(
           "❌ Não foi possível baixar o áudio.\n\n" +
           "💡 *Tente:*\n" +
-          "• Atualizar yt-dlp: `pip install -U yt-dlp`\n" +
           "• Outra música\n" +
           "• Aguardar alguns minutos"
         );
       }
 
-      // Conversão
-      console.log("[PLAY] Convertendo para MP3...");
-      await exec(
-        `ffmpeg -y -loglevel error -i "${tempInput}" -vn -ab 192k -ar 44100 -ac 2 "${tempOutput}"`,
-        { timeout: 120000 }
-      );
-
-      if (!fs.existsSync(tempOutput)) {
-        throw new Error("Conversão falhou");
-      }
+      // O script Python já retorna o caminho do MP3
+      const tempOutput = tempOutputPath;
 
       const fileSize = fs.statSync(tempOutput).size;
       console.log(`[PLAY] ✓ MP3 pronto: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
@@ -365,7 +145,6 @@ export default {
     } finally {
       // Limpeza
       try {
-        if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
         if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
       } catch (cleanErr) {
         console.error("[PLAY] Erro na limpeza:", cleanErr);
