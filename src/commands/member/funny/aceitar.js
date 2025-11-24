@@ -2,42 +2,10 @@ import path from "node:path";
 import { ASSETS_DIR, PREFIX } from "../../../config.js";
 import { InvalidParameterError } from "../../../errors/index.js";
 import { onlyNumbers } from "../../../utils/index.js";
-
-// Mesmo sistema de pendingProposals
-const pendingProposals = new Map();
-
-function cleanExpiredProposals() {
-  const now = Date.now();
-  const FIVE_MINUTES = 5 * 60 * 1000;
-
-  for (const [groupId, proposals] of pendingProposals.entries()) {
-    for (const [targetLid, data] of Object.entries(proposals)) {
-      if (now - data.timestamp > FIVE_MINUTES) {
-        delete proposals[targetLid];
-      }
-    }
-
-    if (Object.keys(proposals).length === 0) {
-      pendingProposals.delete(groupId);
-    }
-  }
-}
-
-function hasPendingProposal(groupId, targetLid) {
-  cleanExpiredProposals();
-  return pendingProposals.get(groupId)?.[targetLid];
-}
-
-function removeProposal(groupId, targetLid) {
-  const proposals = pendingProposals.get(groupId);
-  if (proposals) {
-    delete proposals[targetLid];
-
-    if (Object.keys(proposals).length === 0) {
-      pendingProposals.delete(groupId);
-    }
-  }
-}
+import {
+  hasPendingProposal,
+  removeProposal,
+} from "../../../utils/marriage-proposals.js";
 
 export default {
   name: "aceitar",
@@ -51,7 +19,7 @@ export default {
     sendReply,
     args,
     sender,
-    remoteJid
+    remoteJid,
   }) => {
     if (!args.length) {
       throw new InvalidParameterError(
@@ -61,7 +29,7 @@ export default {
 
     const proposerLid = `${onlyNumbers(args[0])}@lid`;
 
-    // Verifica se existe um pedido pendente para o usuário
+    // Verifica se existe um pedido pendente para o usuário atual (sender)
     const proposal = hasPendingProposal(remoteJid, sender);
 
     if (!proposal) {
@@ -89,7 +57,7 @@ export default {
 
 @${senderNumber} aceitou o pedido de casamento de @${proposerNumber}! 💍✨
 
-🎉 Agora vocês estão oficialmente casados no bot! 🥂  
+🎉 Agora vocês estão oficialmente casados no bot! 🥂
 Que o amor de vocês dure para sempre! ❤️
 `;
 

@@ -2,56 +2,24 @@ import path from "node:path";
 import { ASSETS_DIR, PREFIX } from "../../../config.js";
 import { InvalidParameterError } from "../../../errors/index.js";
 import { onlyNumbers } from "../../../utils/index.js";
-
-// Importa as mesmas funções do casar.js
-const pendingProposals = new Map();
-
-function cleanExpiredProposals() {
-  const now = Date.now();
-  const FIVE_MINUTES = 5 * 60 * 1000;
-
-  for (const [groupId, proposals] of pendingProposals.entries()) {
-    for (const [targetLid, data] of Object.entries(proposals)) {
-      if (now - data.timestamp > FIVE_MINUTES) {
-        delete proposals[targetLid];
-      }
-    }
-    
-    if (Object.keys(proposals).length === 0) {
-      pendingProposals.delete(groupId);
-    }
-  }
-}
-
-function hasPendingProposal(groupId, targetLid) {
-  cleanExpiredProposals();
-  return pendingProposals.get(groupId)?.[targetLid];
-}
-
-function removeProposal(groupId, targetLid) {
-  const proposals = pendingProposals.get(groupId);
-  if (proposals) {
-    delete proposals[targetLid];
-    
-    if (Object.keys(proposals).length === 0) {
-      pendingProposals.delete(groupId);
-    }
-  }
-}
+import {
+  hasPendingProposal,
+  removeProposal,
+} from "../../../utils/marriage-proposals.js";
 
 export default {
   name: "rejeitar",
   description: "Rejeita um pedido de casamento.",
   commands: ["rejeitar"],
   usage: `${PREFIX}rejeitar @usuario`,
-  
-  handle: async ({ 
-    sendImageFromFile, 
-    sendErrorReply, 
-    sendReply, 
-    args, 
+
+  handle: async ({
+    sendImageFromFile,
+    sendErrorReply,
+    sendReply,
+    args,
     sender,
-    remoteJid 
+    remoteJid,
   }) => {
     if (!args.length) {
       throw new InvalidParameterError(
@@ -61,9 +29,9 @@ export default {
 
     const proposerLid = `${onlyNumbers(args[0])}@lid`;
 
-    // Verifica se existe um pedido pendente para o remetente atual
+    // Verifica se existe um pedido pendente para o remetente atual (sender)
     const proposal = hasPendingProposal(remoteJid, sender);
-    
+
     if (!proposal) {
       await sendReply("Você não tem nenhum pedido de casamento pendente! 💔");
       return;
@@ -83,7 +51,7 @@ export default {
 
     const senderNumber = onlyNumbers(sender);
     const proposerNumber = onlyNumbers(proposerLid);
-    
+
     const messageText = `
 💔 *PEDIDO REJEITADO* 💔
 
@@ -94,7 +62,12 @@ export default {
 Força aí, guerreiro(a)! 💪
 `;
 
-    const imagePath = path.resolve(ASSETS_DIR, "images", "casar", "rejeitado.jpg");
+    const imagePath = path.resolve(
+      ASSETS_DIR,
+      "images",
+      "casar",
+      "rejeitado.jpg"
+    );
     await sendImageFromFile(imagePath, messageText, [sender, proposerLid]);
   },
 };
