@@ -31,11 +31,14 @@ export default {
       );
     }
 
-    const targetLid = isReply
-      ? replyLid
-      : args[0]
-        ? `${onlyNumbers(args[0])}@lid`
-        : null;
+    let targetLid = isReply ? replyLid : null;
+
+    if (!targetLid && args[0]) {
+      const number = onlyNumbers(args[0]);
+      if (number) {
+        targetLid = `${number}@lid`;
+      }
+    }
 
     if (!targetLid) {
       await sendErrorReply(

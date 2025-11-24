@@ -27,7 +27,16 @@ export default {
       );
     }
 
-    const proposerLid = `${onlyNumbers(args[0])}@lid`;
+    const proposerNumber = onlyNumbers(args[0]);
+
+    if (!proposerNumber) {
+      await sendErrorReply(
+        "Não foi possível identificar o usuário que fez o pedido. Mencione-o corretamente."
+      );
+      return;
+    }
+
+    const proposerLid = `${proposerNumber}@lid`;
 
     // Verifica se existe um pedido pendente para o remetente atual (sender)
     const proposal = hasPendingProposal(remoteJid, sender);
@@ -50,12 +59,12 @@ export default {
     removeProposal(remoteJid, sender);
 
     const senderNumber = onlyNumbers(sender);
-    const proposerNumber = onlyNumbers(proposerLid);
+    const proposerNumberFinal = onlyNumbers(proposerLid);
 
     const messageText = `
 💔 *PEDIDO REJEITADO* 💔
 
-@${senderNumber} rejeitou o pedido de casamento de @${proposerNumber}! 😢
+@${senderNumber} rejeitou o pedido de casamento de @${proposerNumberFinal}! 😢
 
 Às vezes o amor não é correspondido... 🥀
 
