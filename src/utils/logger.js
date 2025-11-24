@@ -6,36 +6,45 @@
 import pkg from "../../package.json" with { type: "json" };
 
 export function sayLog(message) {
-  console.log("\x1b[36m[MARCIO BOT | TALK]\x1b[0m", message);
+  console.log("\x1b[36m[TASSIO BOT | TALK]\x1b[0m", message);
 }
 
 export function inputLog(message) {
-  console.log("\x1b[30m[MARCIO BOT | INPUT]\x1b[0m", message);
+  console.log("\x1b[30m[TASSIO BOT | INPUT]\x1b[0m", message);
 }
 
 export function infoLog(message) {
-  console.log("\x1b[34m[MARCIO BOT | INFO]\x1b[0m", message);
+  console.log("\x1b[34m[TASSIO BOT | INFO]\x1b[0m", message);
 }
 
 export function successLog(message) {
-  console.log("\x1b[32m[MARCIO BOT | SUCCESS]\x1b[0m", message);
+  console.log("\x1b[32m[TASSIO BOT | SUCCESS]\x1b[0m", message);
 }
 
 export function errorLog(message) {
-  console.log("\x1b[31m[MARCIO BOT | ERROR]\x1b[0m", message);
+  console.log("\x1b[31m[TASSIO BOT| ERROR]\x1b[0m", message);
 }
 
 export function warningLog(message) {
-  console.log("\x1b[33m[MARCIO BOT | WARNING]\x1b[0m", message);
+  console.log("\x1b[33m[TASSIO BOT | WARNING]\x1b[0m", message);
 }
 
 export function bannerLog() {
-console.log(` _____ ______   ________  ________  ________  ___  ________                 ________  ________  _________   `);
-console.log(`|\\   _ \\  _   \\|\\   __  \\|\\   __  \\|\\   ____\\|\\  \\|\\   __  \\               |\\   __  \\|\\   __  \\|\\___   ___\\ `);
-console.log(`\\ \\  \\\\\\__\\ \\  \\ \\  \\|\\  \\ \\  \\|\\  \\ \\  \\___|\\ \\  \\ \\  \\|\\  \\  ____________\\ \\  \\|\\ /\\ \\  \\|\\  \\|___ \\  \\_| `);
-console.log(` \\ \\  \\\\|__| \\  \\ \\   __  \\ \\   _  _\\ \\  \\    \\ \\  \\ \\  \\\\\\  \\|\\____________\\ \\   __  \\ \\  \\\\\\  \\   \\ \\  \\  `);
-console.log(`  \\ \\  \\    \\ \\  \\ \\  \\ \\  \\ \\  \\\\  \\\\ \\  \\____\\ \\  \\ \\  \\\\\\  \\|____________|\\ \\  \\|\\  \\ \\  \\\\\\  \\   \\ \\  \\ `);
-console.log(`   \\ \\__\\    \\ \\__\\ \\__\\ \\__\\ \\__\\\\ _\\\\ \\_______\\ \\__\\ \\_______\\              \\ \\_______\\ \\_______\\   \\ \\__\\`);
-console.log(`    \\|__|     \\|__|\\|__|\\|__|\\|__|\\|__|\\|_______|\\|__|\\|_______|               \\|_______|\\|_______|    \\|__|`);
+console.log("        ,----,                                                         ");
+console.log("      ,/   .`|                                              ,----..    ");
+console.log("    ,`   .'  : ,---,       .--.--.    .--.--.      ,---,   /   /   \\   ");
+console.log("  ;    ;     /'  .' \\     /  /    '. /  /    '. ,`--.' |  /   .     :  ");
+console.log(".\'___,/    ,'/  ;    '.  |  :  /`. /|  :  /`. / |   :  : .   /   ;.  \\ ");
+console.log("|    :     |:  :       \\ ;  |  |--` ;  |  |--`  :   |  '.   ;   /  ` ; ");
+console.log(";    |.';  ;:  |   /\\   \\|  :  ;_   |  :  ;_    |   :  |;   |  ; \\ ; | ");
+console.log("`----'  |  ||  :  ' ;.   :\\  \\    `. \\  \\    `. '   '  ;|   :  | ; | ' ");
+console.log("    '   :  ;|  |  ;/  \\   \\`----.   \\ `----.   \\|   |  |.   |  ' ' ' : ");
+console.log("    |   |  ''  :  | \\  \\ ,'__ \\  \\  | __ \\  \\  |'   :  ;'   ;  \\; /  | ");
+console.log("    '   :  ||  |  '  '--' /  /`--'  //  /`--'  /|   |  ' \\   \\  ',  /  ");
+console.log("    ;   |.' |  :  :      '--'.     /'--'.     / '   :  |  ;   :    /   ");
+console.log("    '---'   |  | ,'        `--'---'   `--'---'  ;   |.'    \\   \\ .'    ");
+console.log("            `--''                               '---'       `---`      ");
+console.log("                                                                       ");
+console.log("                                                                       ");
   console.log(`\x1b[36m🤖 Versão: \x1b[0m${pkg.version}\n`);
 }
