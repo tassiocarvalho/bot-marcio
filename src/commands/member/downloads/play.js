@@ -1,63 +1,92 @@
-import TelegramBot from "node-telegram-bot-api";
-import ytSearch from "yt-search";
-import ytdl from "yt-dlp-exec";
-import ffmpeg from "fluent-ffmpeg";
-import fs from "fs";
+/**
+ * Comando /play – pesquisa música no YouTube, baixa e envia como MP3.
+ */
+
+import yts from "yt-search";
+import fs from "node:fs";
 import path from "node:path";
+import { exec as execChild } from "node:child_process";
+import { promisify } from "node:util";
+import { PREFIX, TEMP_DIR } from "../../config.js";
+import { InvalidParameterError } from "../../errors/index.js";
+import { getRandomName } from "../../utils/index.js";
+import { ytDlp } from "yt-dlp-exec"; // você já instalou
 
-const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true });
+const exec = promisify(execChild);
 
-bot.onText(/\/play (.+)/, async (msg, match) => {
-  const chatId = msg.chat.id;
-  const query = match[1];
+export default {
+  name: "play",
+  description: "Baixa música do YouTube como MP3.",
+  commands: ["play"],
+  usage: `${PREFIX}play <nome da música>`,
 
-  try {
-    // 1) =============== BUSCAR VÍDEO ===============
-    const search = await ytSearch(query);
-    const video = search.videos[0];
-    if (!video) return bot.sendMessage(chatId, "Nenhum resultado encontrado.");
+  handle: async ({ args, sendTextReply, sendWaitReact, sendSuccessReact, sendFileReply }) => {
+    if (!args.length) {
+      throw new InvalidParameterError("Você precisa informar o nome da música!");
+    }
 
-    const videoUrl = video.url;
+    const query = args.join(" ");
 
-    // 2) =============== PRIMEIRA MENSAGEM (INFORMAÇÕES) ===============
-    await bot.sendPhoto(chatId, video.thumbnail, {
-      caption: `🎵 *${video.title}*\n\n👤 Canal: *${video.author.name}*\n⏱ Duração: *${video.timestamp}*\n🔗 ${videoUrl}`,
-      parse_mode: "Markdown",
-    });
+    await sendWaitReact();
 
-    // 3) =============== DOWNLOAD DO ÁUDIO ===============
-    const outputMp3 = path.resolve(`./temp-${Date.now()}.mp3`);
+    let info;
+    try {
+      const search = await yts(query);
 
-    const tempAudio = path.resolve(`./raw-${Date.now()}.m4a`);
+      if (!search.videos.length) {
+        return sendTextReply("❌ Nenhum resultado encontrado no YouTube.");
+      }
 
-    // Baixa somente o áudio com yt-dlp
-    await ytdl(videoUrl, {
-      extractAudio: false,
-      audioFormat: "m4a",
-      output: tempAudio
-    });
+      info = search.videos[0]; // pega o primeiro vídeo da lista
+    } catch (e) {
+      console.error(e);
+      return sendTextReply("❌ Erro ao pesquisar no YouTube.");
+    }
 
-    // 4) =============== CONVERTER PARA MP3 ===============
-    await new Promise((resolve, reject) => {
-      ffmpeg(tempAudio)
-        .toFormat("mp3")
-        .on("end", resolve)
-        .on("error", reject)
-        .save(outputMp3);
-    });
+    // Mensagem inicial com informações
+    await sendTextReply(
+      `🎵 *Resultado encontrado:*\n\n` +
+      `📌 *Título:* ${info.title}\n` +
+      `👤 *Canal:* ${info.author.name}\n` +
+      `⏱️ *Duração:* ${info.timestamp}\n` +
+      `🔗 https://youtube.com/watch?v=${info.videoId}\n\n` +
+      `⏳ Baixando e convertendo para MP3...`
+    );
 
-    fs.unlinkSync(tempAudio);
+    const videoUrl = info.url;
+    const tempInput = path.join(TEMP_DIR, getRandomName("webm"));
+    const tempOutput = path.join(TEMP_DIR, getRandomName("mp3"));
 
-    // 5) =============== SEGUNDA MENSAGEM (O ÁUDIO MP3) ===============
-    await bot.sendAudio(chatId, outputMp3, {
-      title: video.title,
-      performer: video.author.name,
-    });
+    try {
+      // === 1) Baixa áudio com yt-dlp
+      await ytDlp(videoUrl, {
+        output: tempInput,
+        extractAudio: false,
+        audioFormat: "best",
+        audioQuality: 0,
+        quiet: true,
+      });
 
-    fs.unlinkSync(outputMp3);
+      // === 2) Converte para MP3 (FFmpeg)
+      await exec(
+        `ffmpeg -y -i "${tempInput}" -vn -ab 192k "${tempOutput}"`
+      );
 
-  } catch (err) {
-    console.error(err);
-    bot.sendMessage(chatId, "Erro ao processar o comando.");
-  }
-});
+      if (!fs.existsSync(tempOutput)) {
+        throw new Error("Conversão falhou.");
+      }
+
+      await sendSuccessReact();
+
+      // === 3) Envia MP3 para o usuário
+      await sendFileReply(tempOutput, `${info.title}.mp3`);
+    } catch (err) {
+      console.error("Erro em /play:", err);
+      return sendTextReply("❌ Ocorreu um erro ao baixar ou converter o áudio.");
+    } finally {
+      // Limpa arquivos temporários
+      if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+      if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
+    }
+  },
+};
