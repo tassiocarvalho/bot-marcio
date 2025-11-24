@@ -20,7 +20,8 @@ ${PREFIX}hidtag (respondendo uma mensagem de texto)`,
     remoteJid, 
     sendReact,
     isReply,
-    replyMessage
+    replyMessage,
+    webMessage // Adicione esta prop se existir
   }) => {
     const { participants } = await socket.groupMetadata(remoteJid);
     const mentions = participants.map(({ id }) => id);
@@ -29,19 +30,36 @@ ${PREFIX}hidtag (respondendo uma mensagem de texto)`,
 
     let msgParaEnviar = "";
 
+    // ----- DEBUG: Veja a estrutura completa -----
+    if (isReply) {
+      console.log("=== DEBUG REPLY MESSAGE ===");
+      console.log("isReply:", isReply);
+      console.log("replyMessage:", JSON.stringify(replyMessage, null, 2));
+      console.log("webMessage:", JSON.stringify(webMessage, null, 2));
+      console.log("========================");
+    }
+
     // ----- 1. Se respondeu uma mensagem (isReply) -----
     if (isReply && replyMessage) {
-      // Tenta pegar o texto da mensagem respondida
+      // Tentativas de pegar o texto
       const textoDaMensagem = 
         replyMessage.conversation || 
         replyMessage.extendedTextMessage?.text ||
+        replyMessage.text ||
+        replyMessage.message?.conversation ||
+        replyMessage.message?.extendedTextMessage?.text ||
         replyMessage.imageMessage?.caption ||
         replyMessage.videoMessage?.caption;
 
       if (textoDaMensagem) {
         msgParaEnviar = textoDaMensagem;
       } else {
-        return await sendText("❗ Marque uma mensagem **de texto**!", mentions);
+        // Mostra a estrutura para debug
+        return await sendText(
+          `❗ Marque uma mensagem **de texto**!\n\n` +
+          `DEBUG: Verifique o console para ver a estrutura da mensagem.`,
+          mentions
+        );
       }
     }
     // ----- 2. Se escreveu algo após o comando -----
