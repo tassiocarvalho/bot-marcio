@@ -13,21 +13,21 @@ import { errorLog } from "./utils/logger.js";
 
 export function load(socket) {
 
-  // ⬇️⬇️⬇️ ADIÇÃO NECESSÁRIA – NÃO APAGA NADA DO SEU CÓDIGO
-  // implementando sendTextReply que falta
-  socket.sendTextReply = async (m, text) => {
-    try {
+  // 🚀 FIX DEFINITIVO – garante que a função EXISTE antes de tudo
+  if (!socket.sendTextReply) {
+    socket.sendTextReply = async (m, text) => {
       console.log("[DEBUG] sendTextReply executando...");
-      return await socket.sendMessage(
-        m.key.remoteJid,
-        { text },
-        { quoted: m }
-      );
-    } catch (err) {
-      console.error("[DEBUG] Erro em sendTextReply:", err);
-    }
-  };
-  // ⬆️⬆️⬆️ FIM DA ADIÇÃO – resto igual
+      try {
+        return await socket.sendMessage(
+          m.key.remoteJid,
+          { text },
+          { quoted: m }
+        );
+      } catch (e) {
+        console.error("[DEBUG] Erro dentro de sendTextReply:", e);
+      }
+    };
+  }
   
 
   const safeEventHandler = async (callback, data, eventName) => {
