@@ -77,8 +77,7 @@ export default {
   commands: ["play"],
   usage: `${PREFIX}play <nome da música>`,
 
-  handle: async (context) => {
-    const { args, sendReply, sendWaitReact, sendSuccessReact, sendFileReply, sendErrorReply } = context;
+  handle: async ({ args, sendReply, sendWaitReact, sendSuccessReact, sendFileReply, sendErrorReply }) => {
     console.log("\n[PLAY] ========== INICIANDO ==========");
 
     if (!args?.length) {
@@ -142,7 +141,12 @@ export default {
       console.log(`[PLAY] ✓ MP3 pronto: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
       
       await sendSuccessReact();
-      await sendFileReply(tempOutput, `${info.title}.mp3`);
+      
+      if (typeof sendFileReply === 'function') {
+        await sendFileReply(tempOutput, `${info.title}.mp3`);
+      } else {
+        await sendReply("❌ Erro: A função de envio de arquivo não está disponível. O download foi concluído, mas o envio falhou.");
+      }
       
       console.log("[PLAY] ========== CONCLUÍDO ==========\n");
 
