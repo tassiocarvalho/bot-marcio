@@ -4,23 +4,42 @@ export default {
   name: "hide-tag",
   description: "Este comando marcará todos do grupo",
   commands: ["hide-tag", "to-tag", "hidtag"],
-  usage: `${PREFIX}hidtag motivo`,
+  usage: `${PREFIX}hidtag motivo
+
+ou
+
+${PREFIX}hidtag (respondendo uma mensagem de texto)`,
 
   /**
    * @param {CommandHandleProps} props
    */
-  handle: async ({ fullArgs, sendText, socket, remoteJid, sendReact, quoted, type }) => {
+  handle: async ({ 
+    fullArgs, 
+    sendText, 
+    socket, 
+    remoteJid, 
+    sendReact,
+    isReply,
+    replyMessage
+  }) => {
     const { participants } = await socket.groupMetadata(remoteJid);
     const mentions = participants.map(({ id }) => id);
+    
     await sendReact("📢");
 
     let msgParaEnviar = "";
 
-    // ----- 1. Se respondeu uma mensagem -----
-    if (quoted) {
-      // Se a mensagem respondida for texto
-      if (quoted.msg && quoted.msg.conversation) {
-        msgParaEnviar = quoted.msg.conversation;
+    // ----- 1. Se respondeu uma mensagem (isReply) -----
+    if (isReply && replyMessage) {
+      // Tenta pegar o texto da mensagem respondida
+      const textoDaMensagem = 
+        replyMessage.conversation || 
+        replyMessage.extendedTextMessage?.text ||
+        replyMessage.imageMessage?.caption ||
+        replyMessage.videoMessage?.caption;
+
+      if (textoDaMensagem) {
+        msgParaEnviar = textoDaMensagem;
       } else {
         return await sendText("❗ Marque uma mensagem **de texto**!", mentions);
       }
