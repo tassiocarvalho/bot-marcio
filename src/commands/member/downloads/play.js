@@ -16,73 +16,87 @@ const exec = promisify(execChild);
 
 export default {
   name: "play",
-  description: "Baixa música do YouTube como MP3.",
+  description: "Baixa música do YouTube e envia como MP3.",
   commands: ["play"],
   usage: `${PREFIX}play <nome da música>`,
 
-  handle: async ({ args, sendTextReply, sendWaitReact, sendSuccessReact, sendFileReply }) => {
-    if (!args.length) {
+  handle: async ({ sock, msg, args }) => {
+    // === Verificação ===
+    if (!args || !args.length) {
       throw new InvalidParameterError("Você precisa informar o nome da música!");
     }
 
     const query = args.join(" ");
 
-    await sendWaitReact();
+    // Reação de carregando
+    await sock.sendMessage(msg.from, { react: { text: "⏳", key: msg.key } });
 
     let info;
     try {
       const search = await yts(query);
 
       if (!search.videos.length) {
-        return sendTextReply("❌ Nenhum resultado encontrado no YouTube.");
+        return sock.sendMessage(msg.from, {
+          text: "❌ Nenhum resultado encontrado no YouTube."
+        });
       }
 
-      info = search.videos[0]; // pega o primeiro vídeo da lista
+      info = search.videos[0];
     } catch (e) {
       console.error(e);
-      return sendTextReply("❌ Erro ao pesquisar no YouTube.");
+      return sock.sendMessage(msg.from, {
+        text: "❌ Erro ao pesquisar no YouTube."
+      });
     }
 
-    // Mensagem inicial com informações
-    await sendTextReply(
-      `🎵 *Resultado encontrado:*\n\n` +
-      `📌 *Título:* ${info.title}\n` +
-      `👤 *Canal:* ${info.author.name}\n` +
-      `⏱️ *Duração:* ${info.timestamp}\n` +
-      `🔗 https://youtube.com/watch?v=${info.videoId}\n\n` +
-      `⏳ Baixando e convertendo para MP3...`
-    );
+    // Envia mensagem com a prévia
+    await sock.sendMessage(msg.from, {
+      text:
+        `🎵 *Resultado encontrado:*\n\n` +
+        `📌 *Título:* ${info.title}\n` +
+        `👤 *Canal:* ${info.author.name}\n` +
+        `⏱️ *Duração:* ${info.timestamp}\n` +
+        `🔗 https://youtube.com/watch?v=${info.videoId}\n\n` +
+        `⏳ Baixando e convertendo para MP3...`
+    });
 
     const videoUrl = info.url;
     const tempInput = path.join(TEMP_DIR, getRandomName("webm"));
     const tempOutput = path.join(TEMP_DIR, getRandomName("mp3"));
 
     try {
-      // === 1) Baixa áudio com yt-dlp
+      // === 1) Baixa o áudio com yt-dlp
       await ytDlp(videoUrl, {
         output: tempInput,
         extractAudio: false,
-        audioFormat: "best",
-        audioQuality: 0,
         quiet: true,
       });
 
-      // === 2) Converte para MP3 (FFmpeg)
-      await exec(
-        `ffmpeg -y -i "${tempInput}" -vn -ab 192k "${tempOutput}"`
-      );
+      // === 2) Converte para MP3 via FFmpeg
+      await exec(`ffmpeg -y -i "${tempInput}" -vn -ab 192k "${tempOutput}"`);
 
       if (!fs.existsSync(tempOutput)) {
-        throw new Error("Conversão falhou.");
+        throw new Error("Falha na conversão.");
       }
 
-      await sendSuccessReact();
+      // Reação de sucesso
+      await sock.sendMessage(msg.from, {
+        react: { text: "✅", key: msg.key }
+      });
 
-      // === 3) Envia MP3 para o usuário
-      await sendFileReply(tempOutput, `${info.title}.mp3`);
+      // === 3) Envia arquivo MP3
+      await sock.sendMessage(msg.from, {
+        document: fs.readFileSync(tempOutput),
+        mimetype: "audio/mpeg",
+        fileName: `${info.title}.mp3`
+      });
     } catch (err) {
       console.error("Erro em /play:", err);
-      return sendTextReply("❌ Ocorreu um erro ao baixar ou converter o áudio.");
+
+      return sock.sendMessage(msg.from, {
+        text: "❌ Ocorreu um erro ao baixar ou converter o áudio."
+      });
+
     } finally {
       // Limpa arquivos temporários
       if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
