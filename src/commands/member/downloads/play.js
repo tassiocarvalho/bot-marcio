@@ -10,7 +10,7 @@ import { exec as execChild } from "node:child_process";
 import { promisify } from "node:util";
 import { PREFIX, TEMP_DIR } from "../../../config.js";
 import { getRandomName } from "../../../utils/index.js";
-import { ytDlp } from "yt-dl-exec";
+import { ytDlp } from "yt-dlp-exec";
 
 const exec = promisify(execChild);
 
