@@ -12,6 +12,7 @@ import { exec as execChild } from "node:child_process";
 import { promisify } from "node:util";
 import { PREFIX, TEMP_DIR } from "../../../config.js";
 import { getRandomName } from "../../../utils/index.js";
+const COOKIES_PATH = path.join(__dirname, "../../database/youtube_cookies.json");
 
 const exec = promisify(execChild);
 
@@ -216,6 +217,10 @@ async function tryDownload(videoUrl, outputPath, useProxy = true) {
       baseArgs.push(`--proxy "${proxy}"`);
     }
 
+    if (fs.existsSync(COOKIES_PATH)) {
+      baseArgs.push(`--cookies "${COOKIES_PATH}"`);
+    }
+    
     const ytDlpCommand = [
       'yt-dlp',
       ...strategy.args,
