@@ -1,96 +1,63 @@
-import ytdl from "ytdl-core";
+import TelegramBot from "node-telegram-bot-api";
 import ytSearch from "yt-search";
+import ytdl from "yt-dlp-exec";
+import ffmpeg from "fluent-ffmpeg";
 import fs from "fs";
-import path from "path";
-import { Ffmpeg } from "../services/ffmpeg.js"; // sua classe
-import { getRandomNumber } from "../utils/index.js";
+import path from "node:path";
 
-const ffmpeg = new Ffmpeg();
+const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true });
 
-export default {
-  name: "play",
-  description: "Baixa músicas do YouTube",
-  commands: ["play"],
-  usage: "/play nome da música",
+bot.onText(/\/play (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const query = match[1];
 
-  /**
-   * @param {CommandHandleProps} props
-   */
-  async handle({ message, args, client }) {
-    try {
-      if (!args.length) {
-        return message.reply("Digite algo para pesquisar. Exemplo:\n/play faded");
-      }
+  try {
+    // 1) =============== BUSCAR VÍDEO ===============
+    const search = await ytSearch(query);
+    const video = search.videos[0];
+    if (!video) return bot.sendMessage(chatId, "Nenhum resultado encontrado.");
 
-      const query = args.join(" ");
+    const videoUrl = video.url;
 
-      await message.reply("🎵 Procurando música...");
+    // 2) =============== PRIMEIRA MENSAGEM (INFORMAÇÕES) ===============
+    await bot.sendPhoto(chatId, video.thumbnail, {
+      caption: `🎵 *${video.title}*\n\n👤 Canal: *${video.author.name}*\n⏱ Duração: *${video.timestamp}*\n🔗 ${videoUrl}`,
+      parse_mode: "Markdown",
+    });
 
-      // 1️⃣ PESQUISA NO YOUTUBE (SEM LOGIN)
-      const result = await ytSearch(query);
-      if (!result || !result.videos || result.videos.length === 0) {
-        return message.reply("Nenhum vídeo encontrado.");
-      }
+    // 3) =============== DOWNLOAD DO ÁUDIO ===============
+    const outputMp3 = path.resolve(`./temp-${Date.now()}.mp3`);
 
-      const video = result.videos[0]; // pegar o primeiro
+    const tempAudio = path.resolve(`./raw-${Date.now()}.m4a`);
 
-      // 2️⃣ Enviar detalhes do vídeo
-      await message.reply(
-        `🎧 *Resultado encontrado:*\n\n` +
-          `📌 *Título:* ${video.title}\n` +
-          `📀 *Canal:* ${video.author.name}\n` +
-          `⏱ *Duração:* ${video.timestamp}\n` +
-          `👀 *Views:* ${video.views}\n\n` +
-          `🔗 ${video.url}\n\n` +
-          `🎶 Baixando o áudio...`
-      );
+    // Baixa somente o áudio com yt-dlp
+    await ytdl(videoUrl, {
+      extractAudio: false,
+      audioFormat: "m4a",
+      output: tempAudio
+    });
 
-      // 3️⃣ Caminho temporário
-      const tempInput = path.join(
-        ffmpeg.tempDir,
-        `${getRandomNumber(10000, 99999)}.webm`
-      );
+    // 4) =============== CONVERTER PARA MP3 ===============
+    await new Promise((resolve, reject) => {
+      ffmpeg(tempAudio)
+        .toFormat("mp3")
+        .on("end", resolve)
+        .on("error", reject)
+        .save(outputMp3);
+    });
 
-      const tempOutputMp3 = path.join(
-        ffmpeg.tempDir,
-        `${getRandomNumber(10000, 99999)}.mp3`
-      );
+    fs.unlinkSync(tempAudio);
 
-      // 4️⃣ BAIXA O ÁUDIO EM FORMATO WEBM
-      const audio = ytdl(video.url, {
-        filter: "audioonly",
-        quality: "highestaudio",
-      });
+    // 5) =============== SEGUNDA MENSAGEM (O ÁUDIO MP3) ===============
+    await bot.sendAudio(chatId, outputMp3, {
+      title: video.title,
+      performer: video.author.name,
+    });
 
-      // Salvar o arquivo WEBM temporário
-      const writeStream = fs.createWriteStream(tempInput);
-      audio.pipe(writeStream);
+    fs.unlinkSync(outputMp3);
 
-      await new Promise((resolve, reject) => {
-        audio.on("end", resolve);
-        audio.on("error", reject);
-      });
-
-      // 5️⃣ CONVERTER PARA MP3
-      const mp3Path = await ffmpeg.convertToMp3(tempInput);
-
-      // 6️⃣ ENVIAR PARA O USUÁRIO
-      await client.sendMessage(message.from, {
-        audio: {
-          url: mp3Path,
-        },
-        mimetype: "audio/mpeg",
-      });
-
-      // 7️⃣ LIMPAR ARQUIVOS
-      fs.unlinkSync(tempInput);
-      fs.unlinkSync(mp3Path);
-
-      return;
-
-    } catch (err) {
-      console.error(err);
-      return message.reply("❌ Ocorreu um erro ao tentar processar o áudio.");
-    }
-  },
-};
+  } catch (err) {
+    console.error(err);
+    bot.sendMessage(chatId, "Erro ao processar o comando.");
+  }
+});
