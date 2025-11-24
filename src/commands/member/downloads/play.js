@@ -20,8 +20,7 @@ export default {
   commands: ["play"],
   usage: `${PREFIX}play <nome da música>`,
 
-  handle: async (context) => {
-    const { args, sendTextReply, sendWaitReact, sendSuccessReact, sendFileReply } = context;
+  handle: async ({ args, sendReply, sendWaitReact, sendSuccessReact, sendFileReply, sendErrorReply }) => {
     console.log("[DEBUG] Entrou no comando /play");
 
     if (!args?.length) {
@@ -41,7 +40,7 @@ export default {
 
       if (!search.videos.length) {
         console.log("[DEBUG] yt-search não retornou vídeos.");
-        return sendTextReply("❌ Nenhum resultado encontrado no YouTube.");
+        return sendReply("❌ Nenhum resultado encontrado no YouTube."); // CORRIGIDO: sendTextReply -> sendReply
       }
 
       info = search.videos[0];
@@ -49,10 +48,10 @@ export default {
 
     } catch (e) {
       console.error("[ERRO] yt-search falhou:", e);
-      return sendTextReply("❌ Erro ao pesquisar no YouTube.");
+      return sendReply("❌ Erro ao pesquisar no YouTube."); // CORRIGIDO: sendTextReply -> sendReply
     }
 
-    await sendTextReply(
+    await sendReply( // CORRIGIDO: sendTextReply -> sendReply
       `🎵 *Resultado encontrado:*\n\n` +
       `📌 *Título:* ${info.title}\n` +
       `👤 *Canal:* ${info.author.name}\n` +
@@ -90,11 +89,13 @@ export default {
       await sendSuccessReact();
 
       console.log("[DEBUG] Enviando arquivo ao usuário…");
-      await sendFileReply(tempOutput, `${info.title}.mp3`);
+      // A função correta para enviar arquivos de áudio é sendAudioFromFile
+      const sendAudioFromFile = sendFileReply; // Mantendo a compatibilidade com o nome original
+      await sendAudioFromFile(tempOutput, false, true); // false para não ser voice, true para quoted
 
     } catch (err) {
       console.error("[ERRO] Processo /play falhou:", err);
-      return sendTextReply("❌ Ocorreu um erro ao baixar ou converter o áudio.");
+      return sendErrorReply("Ocorreu um erro ao baixar ou converter o áudio."); // CORRIGIDO: sendTextReply -> sendErrorReply
     } finally {
       console.log("[DEBUG] Limpando arquivos temporários…");
       // O yt-dlp não cria um arquivo temporário intermediário no modo -x, então removemos a limpeza do tempInput.

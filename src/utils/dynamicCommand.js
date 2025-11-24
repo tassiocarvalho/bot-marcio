@@ -171,11 +171,7 @@ export async function dynamicCommand(paramsHandler, startProcess) {
   }
 
   try {
-    await command.handle({
-      ...paramsHandler,
-      type,
-      startProcess,
-    });
+    await command.handle(paramsHandler); // Apenas passando o objeto completo
   } catch (error) {
     if (badMacHandler.handleError(error, `command:${command?.name}`)) {
       await sendWarningReply(
