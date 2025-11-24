@@ -14,7 +14,7 @@ import { PREFIX, TEMP_DIR } from "../../../config.js";
 import { getRandomName } from "../../../utils/index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const COOKIES_PATH = path.join(__dirname, "youtube_cookies.json");
+const COOKIES_PATH = path.join(__dirname, "youtube_cookies.txt");
 
 const exec = promisify(execChild);
 
@@ -223,11 +223,8 @@ async function tryDownload(videoUrl, outputPath, useProxy = true) {
       baseArgs.push(`--proxy "${proxy}"`);
     }
 
-    if (hasCookies) {
-      // Garantindo que os cookies serão passados
-      baseArgs.push(`--cookies "${COOKIES_PATH}"`);
-      // Opcional: força o client default do YouTube para evitar erro de "sign in"
-      strategy.args.push('--extractor-args "youtube:player_client=default"');
+    if (fs.existsSync(COOKIES_PATH)) { 
+        baseArgs.push(`--cookies "${COOKIES_PATH}"`);
     }
 
     const ytDlpCommand = [
