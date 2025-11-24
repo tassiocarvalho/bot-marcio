@@ -20,7 +20,7 @@ export default {
   commands: ["play"],
   usage: `${PREFIX}play <nome da música>`,
 
-  handle: async ({ args, sendReply, sendWaitReact, sendSuccessReact, sendFileReply, sendErrorReply }) => { // Alterado para usar sendReply e sendErrorReply
+  handle: async ({ args, sendReply, sendWaitReact, sendSuccessReact, sendFileReply, sendErrorReply }) => {
     console.log("[DEBUG] Entrou no comando /play");
 
     if (!args?.length) {
@@ -61,28 +61,30 @@ export default {
      );
 
     const videoUrl = info.url;
-    const tempInput = path.join(TEMP_DIR, getRandomName("webm"));
-    const tempOutput = path.join(TEMP_DIR, getRandomName("mp3"));
+    const tempInput = path.join(TEMP_DIR, getRandomName("webm")); // Arquivo de áudio baixado
+    const tempOutput = path.join(TEMP_DIR, getRandomName("mp3")); // Arquivo MP3 final
 
     console.log("[DEBUG] Temp input:", tempInput);
     console.log("[DEBUG] Temp output:", tempOutput);
 
     try {
-      console.log("[DEBUG] Iniciando download via yt-dlp…");
+      console.log("[DEBUG] Iniciando download do áudio via yt-dlp…");
 
-      // Usar yt-dlp para baixar o áudio e convertê-lo diretamente para MP3 usando ffmpeg
-      // O yt-dlp cuidará da conversão para MP3 se o formato for especificado.
-      // O nome do arquivo de saída será o nome do arquivo temporário MP3.
-      // O yt-dlp usa o ffmpeg automaticamente para a conversão.
+      // 1. Download do melhor formato de áudio (sem conversão interna do yt-dlp)
       await exec(
-        `yt-dlp -x --audio-format mp3 --no-check-formats --no-cache-dir --force-ipv4 --extractor-retries 5 --extractor-args "youtube:player_client=web" -o "${tempOutput}" "${videoUrl}"`
+        `yt-dlp -f bestaudio --no-check-formats --no-cache-dir --force-ipv4 --extractor-retries 5 --extractor-args "youtube:player_client=web" -o "${tempInput}" "${videoUrl}"`
       );
 
-      console.log("[DEBUG] Download e conversão concluídos via yt-dlp/ffmpeg.");
+      console.log("[DEBUG] Download concluído. Convertendo via ffmpeg…");
+
+      // 2. Conversão explícita para MP3 usando ffmpeg
+      await exec(
+        `ffmpeg -y -i "${tempInput}" -vn -ab 192k "${tempOutput}"`
+      );
 
       if (!fs.existsSync(tempOutput)) {
         console.log("[DEBUG] Falha: arquivo MP3 não gerado.");
-        throw new Error("Download/Conversão falhou.");
+        throw new Error("Conversão falhou.");
       }
 
       console.log("[DEBUG] MP3 gerado com sucesso.");
@@ -96,9 +98,8 @@ export default {
       return sendErrorReply("Ocorreu um erro ao baixar ou converter o áudio.");
     } finally {
       console.log("[DEBUG] Limpando arquivos temporários…");
-      // O yt-dlp não cria um arquivo temporário intermediário no modo -x, então removemos a limpeza do tempInput.
-      // if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
-      if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
+      if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput); // Limpa o arquivo de áudio baixado
+      if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput); // Limpa o arquivo MP3 final
     }
   },
 };
