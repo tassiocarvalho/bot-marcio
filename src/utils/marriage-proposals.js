@@ -1,6 +1,5 @@
 /**
  * Módulo compartilhado para gerenciar pedidos de casamento
- * Este módulo é usado pelos comandos: casar, aceitar e rejeitar
  */
 
 // Armazena pedidos de casamento pendentes
@@ -30,9 +29,6 @@ function cleanExpiredProposals() {
 
 /**
  * Verifica se existe pedido pendente para um usuário
- * @param {string} groupId - ID do grupo
- * @param {string} targetLid - LID do usuário que recebeu o pedido
- * @returns {object|undefined} Dados do pedido se existir
  */
 export function hasPendingProposal(groupId, targetLid) {
   cleanExpiredProposals();
@@ -41,9 +37,6 @@ export function hasPendingProposal(groupId, targetLid) {
 
 /**
  * Cria um novo pedido de casamento
- * @param {string} groupId - ID do grupo
- * @param {string} targetLid - LID do usuário que vai receber o pedido
- * @param {string} senderLid - LID do usuário que está fazendo o pedido
  */
 export function createProposal(groupId, targetLid, senderLid) {
   cleanExpiredProposals();
@@ -60,8 +53,6 @@ export function createProposal(groupId, targetLid, senderLid) {
 
 /**
  * Remove um pedido de casamento
- * @param {string} groupId - ID do grupo
- * @param {string} targetLid - LID do usuário que recebeu o pedido
  */
 export function removeProposal(groupId, targetLid) {
   const proposals = pendingProposals.get(groupId);

@@ -1,7 +1,7 @@
 import path from "node:path";
 import { ASSETS_DIR, PREFIX } from "../../../config.js";
 import { InvalidParameterError } from "../../../errors/index.js";
-import { onlyNumbers } from "../../../utils/index.js";
+import { onlyNumbers } from "../../../utils/index.js"; // Use a versão segura aqui
 import {
   hasPendingProposal,
   createProposal,
