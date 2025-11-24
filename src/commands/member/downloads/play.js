@@ -1,6 +1,6 @@
 /**
  * Comando /play – pesquisa música no YouTube, baixa e envia como MP3.
- * CORRIGIDO: Bypass de detecção de bot do YouTube
+ * SOLUÇÃO: Múltiplas estratégias de fallback anti-bot
  */
 
 import InvalidParameterError from "../../../errors/InvalidParameterError.js";
@@ -13,6 +13,89 @@ import { PREFIX, TEMP_DIR } from "../../../config.js";
 import { getRandomName } from "../../../utils/index.js";
 
 const exec = promisify(execChild);
+
+// Estratégias de download em ordem de prioridade
+const DOWNLOAD_STRATEGIES = [
+  {
+    name: "android_music",
+    args: [
+      '-f bestaudio',
+      '--extractor-args "youtube:player_client=android_music"',
+      '--no-check-certificate',
+      '--geo-bypass'
+    ]
+  },
+  {
+    name: "mediaconnect",
+    args: [
+      '-f bestaudio',
+      '--extractor-args "youtube:player_client=mediaconnect"',
+      '--no-check-certificate'
+    ]
+  },
+  {
+    name: "web_embed",
+    args: [
+      '-f bestaudio',
+      '--extractor-args "youtube:player_client=web;player_skip=webpage,configs"',
+      '--no-check-certificate'
+    ]
+  },
+  {
+    name: "mweb",
+    args: [
+      '-f bestaudio',
+      '--extractor-args "youtube:player_client=mweb"',
+      '--user-agent "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36"'
+    ]
+  }
+];
+
+async function tryDownload(videoUrl, outputPath, maxRetries = DOWNLOAD_STRATEGIES.length) {
+  for (let i = 0; i < maxRetries; i++) {
+    const strategy = DOWNLOAD_STRATEGIES[i];
+    
+    console.log(`[DEBUG] Tentativa ${i + 1}/${maxRetries}: estratégia "${strategy.name}"`);
+
+    const baseArgs = [
+      '--no-cache-dir',
+      '--force-ipv4',
+      '--extractor-retries 3',
+      '--fragment-retries 3',
+      '--no-warnings',
+      '--no-check-formats'
+    ];
+
+    const ytDlpCommand = [
+      'yt-dlp',
+      ...strategy.args,
+      ...baseArgs,
+      `-o "${outputPath}"`,
+      `"${videoUrl}"`
+    ].join(' ');
+
+    try {
+      console.log(`[DEBUG] Executando: ${ytDlpCommand}`);
+      await exec(ytDlpCommand, { timeout: 60000 }); // 60s timeout
+      
+      if (fs.existsSync(outputPath)) {
+        console.log(`[DEBUG] ✓ Download bem-sucedido com estratégia "${strategy.name}"`);
+        return true;
+      }
+    } catch (err) {
+      console.error(`[DEBUG] ✗ Estratégia "${strategy.name}" falhou:`, err.message);
+      
+      // Se não é o último retry, continua
+      if (i < maxRetries - 1) {
+        console.log(`[DEBUG] Aguardando 2s antes da próxima tentativa...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        continue;
+      }
+    }
+  }
+  
+  return false;
+}
 
 export default {
   name: "play",
@@ -68,39 +151,28 @@ export default {
     console.log("[DEBUG] Temp output:", tempOutput);
 
     try {
-      console.log("[DEBUG] Iniciando download do áudio via yt-dlp…");
+      console.log("[DEBUG] Iniciando download com múltiplas estratégias...");
 
-      // SOLUÇÃO 1: Usar cookies e múltiplos clients
-      const ytDlpCommand = [
-        'yt-dlp',
-        '-f bestaudio',
-        '--no-check-formats',
-        '--no-cache-dir',
-        '--force-ipv4',
-        '--extractor-retries 10',
-        '--fragment-retries 10',
-        '--retry-sleep 3',
-        // Client alternativo (iOS funciona melhor)
-        '--extractor-args "youtube:player_client=ios,web"',
-        // User-Agent personalizado
-        '--user-agent "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15"',
-        // Adiciona delay entre requests
-        '--sleep-requests 1',
-        '--sleep-interval 1',
-        // Formato de saída
-        `-o "${tempInput}"`,
-        `"${videoUrl}"`
-      ].join(' ');
+      // Tenta download com fallback
+      const downloadSuccess = await tryDownload(videoUrl, tempInput);
 
-      console.log("[DEBUG] Comando yt-dlp:", ytDlpCommand);
-
-      await exec(ytDlpCommand);
+      if (!downloadSuccess) {
+        console.error("[DEBUG] Todas as estratégias de download falharam");
+        return sendErrorReply(
+          "❌ Não foi possível baixar o áudio do YouTube.\n\n" +
+          "💡 *Possíveis soluções:*\n" +
+          "1. Atualize o yt-dlp: `pip install -U yt-dlp`\n" +
+          "2. Tente outro vídeo\n" +
+          "3. Aguarde alguns minutos e tente novamente"
+        );
+      }
 
       console.log("[DEBUG] Download concluído. Convertendo via ffmpeg…");
 
       // Conversão para MP3
       await exec(
-        `ffmpeg -y -i "${tempInput}" -vn -ab 192k -ar 44100 "${tempOutput}"`
+        `ffmpeg -y -i "${tempInput}" -vn -ab 192k -ar 44100 -ac 2 "${tempOutput}"`,
+        { timeout: 120000 } // 2min timeout
       );
 
       if (!fs.existsSync(tempOutput)) {
@@ -108,7 +180,9 @@ export default {
         throw new Error("Conversão falhou.");
       }
 
-      console.log("[DEBUG] MP3 gerado com sucesso.");
+      const fileSize = fs.statSync(tempOutput).size;
+      console.log(`[DEBUG] MP3 gerado com sucesso (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
+      
       await sendSuccessReact();
 
       console.log("[DEBUG] Enviando arquivo ao usuário…");
@@ -117,15 +191,16 @@ export default {
     } catch (err) {
       console.error("[ERRO] Processo /play falhou:", err);
       
-      // Mensagem de erro mais informativa
-      if (err.message?.includes("Sign in to confirm")) {
-        return sendErrorReply(
-          "❌ O YouTube bloqueou o download. Tentando alternativa...\n\n" +
-          "💡 Dica: Atualize o yt-dlp com: `pip install -U yt-dlp`"
-        );
+      // Mensagens de erro específicas
+      if (err.killed || err.signal === 'SIGTERM') {
+        return sendErrorReply("❌ O processo levou muito tempo e foi cancelado.");
       }
       
-      return sendErrorReply("❌ Ocorreu um erro ao baixar ou converter o áudio.");
+      if (err.message?.includes("ffmpeg")) {
+        return sendErrorReply("❌ Erro na conversão do áudio. Verifique se o ffmpeg está instalado.");
+      }
+      
+      return sendErrorReply("❌ Ocorreu um erro ao processar o áudio.");
       
     } finally {
       console.log("[DEBUG] Limpando arquivos temporários…");
