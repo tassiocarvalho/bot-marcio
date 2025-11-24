@@ -3,7 +3,7 @@ import os
 import json
 from yt_dlp import YoutubeDL
 
-def download_mp3(video_url, output_path):
+def download_mp3(video_url, output_path, cookies_path=None):
     """
     Baixa o áudio de um vídeo do YouTube e salva como MP3.
     """
@@ -11,7 +11,7 @@ def download_mp3(video_url, output_path):
         # Configurações do yt-dlp
         ydl_opts = {
             'format': 'bestaudio/best',
-            'extractor_args': {'youtube': {'player_client': 'web'}},
+            'extractor_args': {'youtube': {'player_client': 'web'}}, # Tentativa de contornar restrições
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -30,6 +30,10 @@ def download_mp3(video_url, output_path):
             'postprocessor_args': ['-metadata', 'title='], # Remove metadados de título
         }
 
+        if cookies_path and os.path.exists(cookies_path):
+            ydl_opts['cookiefile'] = cookies_path
+            print(f"Usando cookies de: {cookies_path}", file=sys.stderr)
+        
         with YoutubeDL(ydl_opts) as ydl:
             # O yt-dlp adiciona a extensão .mp3 automaticamente
             # O output_path deve ser passado SEM a extensão
@@ -47,13 +51,14 @@ def download_mp3(video_url, output_path):
         return {"success": False, "error": str(e)}
 
 if __name__ == "__main__":
-    # Espera 2 argumentos: URL do vídeo e caminho de saída (sem extensão)
-    if len(sys.argv) != 3:
-        print(json.dumps({"success": False, "error": "Uso: python yt_download.py <video_url> <output_path_sem_extensao>"}))
+    # Espera 3 argumentos: URL do vídeo, caminho de saída (sem extensão) e caminho do arquivo de cookies (opcional)
+    if len(sys.argv) < 3:
+        print(json.dumps({"success": False, "error": "Uso: python yt_download.py <video_url> <output_path_sem_extensao> [cookies_path]"}))
         sys.exit(1)
 
     video_url = sys.argv[1]
     output_path_base = sys.argv[2]
+    cookies_path = sys.argv[3] if len(sys.argv) > 3 else None
     
-    result = download_mp3(video_url, output_path_base)
+    result = download_mp3(video_url, output_path_base, cookies_path)
     print(json.dumps(result))

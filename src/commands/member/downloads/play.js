@@ -1,6 +1,6 @@
 /**
  * Comando /play – pesquisa música no YouTube, baixa e envia como MP3.
- * Sistema completo com proxy rotativo + auto-atualização + múltiplas estratégias
+ * Sistema simplificado usando script Python (yt-dlp) com suporte a cookies.
  */
 import { fileURLToPath } from "node:url";
 import InvalidParameterError from "../../../errors/InvalidParameterError.js";
@@ -11,10 +11,12 @@ import { exec as execChild } from "node:child_process";
 import { promisify } from "node:util";
 import { PREFIX, TEMP_DIR } from "../../../config.js";
 import { getRandomName } from "../../../utils/index.js";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const exec = promisify(execChild);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const COOKIES_PATH = path.join(__dirname, "youtube_cookies.txt");
+
 
 // ============================================
 // SISTEMA DE DOWNLOAD SIMPLIFICADO (via Python)
@@ -31,11 +33,24 @@ async function downloadMp3(videoUrl, outputPath) {
   
   console.log("[DOWNLOAD] Iniciando download via script Python...");
   
-  const command = `python3 ${pythonScriptPath} "${videoUrl}" "${outputPath}"`;
+  let command = `python3 ${pythonScriptPath} "${videoUrl}" "${outputPath}"`;
   
+  // Adiciona o caminho dos cookies se o arquivo existir
+  if (fs.existsSync(COOKIES_PATH)) {
+    command += ` "${COOKIES_PATH}"`;
+    console.log(`[DOWNLOAD] Cookies encontrados! Usando: ${COOKIES_PATH}`);
+  } else {
+    console.log("[DOWNLOAD] Cookies não encontrados. Tentando sem autenticação.");
+  }
+
   try {
-    const { stdout } = await exec(command, { timeout: 120000 }); // 2 minutos de timeout
+    const { stdout, stderr } = await exec(command, { timeout: 120000 }); // 2 minutos de timeout
     
+    // O script Python imprime logs de cookies no stderr
+    if (stderr) {
+        console.log(`[PYTHON LOG] ${stderr.trim()}`);
+    }
+
     const result = JSON.parse(stdout.trim());
     
     if (result.success && fs.existsSync(result.path)) {
@@ -146,7 +161,7 @@ export default {
     } finally {
       // Limpeza
       try {
-        if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
+        if (tempOutput && fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
       } catch (cleanErr) {
         console.error("[PLAY] Erro na limpeza:", cleanErr);
       }
