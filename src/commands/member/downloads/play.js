@@ -77,7 +77,8 @@ export default {
   commands: ["play"],
   usage: `${PREFIX}play <nome da música>`,
 
-  handle: async ({ args, sendReply, sendWaitReact, sendSuccessReact, sendFileReply, sendErrorReply }) => {
+  handle: async (context) => {
+    const { args, sendReply, sendWaitReact, sendSuccessReact, sendFileReply, sendErrorReply } = context;
     console.log("\n[PLAY] ========== INICIANDO ==========");
 
     if (!args?.length) {
