@@ -75,7 +75,7 @@ export default {
       // O nome do arquivo de saída será o nome do arquivo temporário MP3.
       // O yt-dlp usa o ffmpeg automaticamente para a conversão.
       await exec(
-        `yt-dlp -x --audio-format mp3 -o "${tempOutput}" "${videoUrl}"`
+        `yt-dlp -x --audio-format mp3 --no-check-formats --no-cache-dir -o "${tempOutput}" "${videoUrl}"`
       );
 
       console.log("[DEBUG] Download e conversão concluídos via yt-dlp/ffmpeg.");
