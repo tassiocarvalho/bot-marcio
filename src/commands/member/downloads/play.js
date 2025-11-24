@@ -2,7 +2,7 @@
  * Comando /play – pesquisa música no YouTube, baixa e envia como MP3.
  * Sistema completo com proxy rotativo + auto-atualização + múltiplas estratégias
  */
-
+import { fileURLToPath } from "node:url";
 import InvalidParameterError from "../../../errors/InvalidParameterError.js";
 import yts from "yt-search";
 import fs from "node:fs";
@@ -12,6 +12,8 @@ import { exec as execChild } from "node:child_process";
 import { promisify } from "node:util";
 import { PREFIX, TEMP_DIR } from "../../../config.js";
 import { getRandomName } from "../../../utils/index.js";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const COOKIES_PATH = path.join(__dirname, "youtube_cookies.json");
 
 const exec = promisify(execChild);
