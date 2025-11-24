@@ -20,7 +20,8 @@ export default {
   commands: ["play"],
   usage: `${PREFIX}play <nome da música>`,
 
-  handle: async ({ args, sendTextReply, sendWaitReact, sendSuccessReact, sendFileReply }) => {
+  handle: async (context) => {
+    const { args, sendTextReply, sendWaitReact, sendSuccessReact, sendFileReply } = context;
     console.log("[DEBUG] Entrou no comando /play");
 
     if (!args?.length) {
