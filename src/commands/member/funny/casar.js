@@ -69,12 +69,20 @@ export default {
   commands: ["casamento"],
   usage: `${PREFIX}casamento @usuario ou respondendo a mensagem`,
   
-  handle: async ({ sendGifFromFile, sendErrorReply, sendReply, replyLid, args, isReply, sender }) => {
-    if (!args.length && !isReply) {
-      throw new InvalidParameterError(
-        "Você precisa mencionar ou marcar alguém para casar!"
-      );
-    }
+handle: async ({ sendGifFromFile, sendErrorReply, sendReply, replyLid, args, isReply, sender }) => {
+  console.log('=== DEBUG CASAMENTO ===');
+  console.log('args:', args);
+  console.log('args[0]:', args[0]);
+  console.log('isReply:', isReply);
+  console.log('replyLid:', replyLid);
+  console.log('sender:', sender);
+  console.log('=======================');
+  
+  if (!args.length && !isReply) {
+    throw new InvalidParameterError(
+      "Você precisa mencionar ou marcar alguém para casar!"
+    );
+  }
 
     const targetLid = isReply ? replyLid : args[0] ? `${onlyNumbers(args[0])}@lid` : null;
 
