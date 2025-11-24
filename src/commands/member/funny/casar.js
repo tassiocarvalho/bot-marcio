@@ -1,44 +1,82 @@
 import path from "node:path";
 import { ASSETS_DIR, PREFIX } from "../../../config.js";
 import { InvalidParameterError } from "../../../errors/index.js";
-import { onlyNumbers } from "../../../utils/index.js"; // Use a versão segura aqui
-import {
-  hasPendingProposal,
-  createProposal,
-  removeProposal,
-  getExpirationTime,
-} from "../../../utils/marriage-proposals.js";
+import { onlyNumbers } from "../../../utils/index.js";
+
+const IMMUNE_NUMBERS = {
+  "557583258635": true,
+  "5575983258635": true,
+  "7583258635": true,
+  "75983258635": true,
+};
+
+const LID_TO_PHONE_MAP = {
+  "256719003369709": "557583258635",
+};
+
+function getRealPhoneNumber(lid) {
+  const cleanLid = onlyNumbers(lid);
+  
+  if (cleanLid in LID_TO_PHONE_MAP) {
+    return LID_TO_PHONE_MAP[cleanLid];
+  }
+  
+  return cleanLid;
+}
+
+function getAllNumberVariations(phoneNumber) {
+  const variations = new Set();
+  
+  variations.add(phoneNumber);
+  
+  if (!phoneNumber.startsWith("55") && (phoneNumber.length === 10 || phoneNumber.length === 11)) {
+    variations.add("55" + phoneNumber);
+  }
+  
+  if (phoneNumber.startsWith("55") && phoneNumber.length >= 12) {
+    variations.add(phoneNumber.substring(2));
+  }
+  
+  const allVariations = Array.from(variations);
+  allVariations.forEach(variant => {
+    if (variant.length === 11 && variant.charAt(2) === "9") {
+      variations.add(variant.substring(0, 2) + variant.substring(3));
+    }
+    if (variant.length === 13 && variant.startsWith("55") && variant.charAt(4) === "9") {
+      variations.add(variant.substring(0, 4) + variant.substring(5));
+    }
+  });
+  
+  return Array.from(variations);
+}
+
+function isImmune(lid) {
+  const realPhone = getRealPhoneNumber(lid);
+  const variations = getAllNumberVariations(realPhone);
+  
+  for (const variant of variations) {
+    if (variant in IMMUNE_NUMBERS) {
+      return true;
+    }
+  }
+  
+  return false;
+}
 
 export default {
   name: "casar",
-  description: "Pede alguém em casamento.",
+  description: "Casa com alguém.",
   commands: ["casar"],
   usage: `${PREFIX}casar @usuario ou respondendo a mensagem`,
-
-  handle: async ({
-    sendImageFromFile,
-    sendErrorReply,
-    sendReply,
-    replyLid,
-    args,
-    isReply,
-    sender,
-    remoteJid,
-  }) => {
+  
+  handle: async ({ sendGifFromFile, sendErrorReply, sendReply, replyLid, args, isReply, sender }) => {
     if (!args.length && !isReply) {
       throw new InvalidParameterError(
-        "Você precisa mencionar ou marcar alguém para pedir em casamento!"
+        "Você precisa mencionar ou marcar alguém para casar!"
       );
     }
 
-    let targetLid = isReply ? replyLid : null;
-
-    if (!targetLid && args[0]) {
-      const number = onlyNumbers(args[0]);
-      if (number) {
-        targetLid = `${number}@lid`;
-      }
-    }
+    const targetLid = isReply ? replyLid : args[0] ? `${onlyNumbers(args[0])}@lid` : null;
 
     if (!targetLid) {
       await sendErrorReply(
@@ -47,68 +85,24 @@ export default {
       return;
     }
 
-    if (targetLid === sender) {
-      await sendReply("Você não pode se casar consigo mesmo! 😅");
+    if (isImmune(targetLid)) {
+      const targetNumber = onlyNumbers(targetLid);
+      await sendReply(`@${targetNumber} é imune a casamentos! 🛡️✨`);
       return;
     }
-
-    // Verifica se já existe um pedido pendente para a pessoa
-    const existingProposal = hasPendingProposal(remoteJid, targetLid);
-    if (existingProposal) {
-      const senderNumber = onlyNumbers(existingProposal.senderLid);
-      await sendReply(
-        `@${onlyNumbers(targetLid)} já tem um pedido de casamento pendente de @${senderNumber}! ⏳💍`
-      );
-      return;
-    }
-
-    // Cria o pedido
-    createProposal(remoteJid, targetLid, sender);
 
     const senderNumber = onlyNumbers(sender);
     const targetNumber = onlyNumbers(targetLid);
-
+    
     const messageText = `
-💍 *PEDIDO DE CASAMENTO* 💍
+*Casamento* 💍💒
 
-@${senderNumber} está pedindo @${targetNumber} em casamento! 💕
+@${senderNumber} se casou com @${targetNumber}!
 
-🌹 Você tem *5 minutos* para responder:
-
-✅ Para aceitar: *${PREFIX}aceitar @${senderNumber}*
-❌ Para rejeitar: *${PREFIX}rejeitar @${senderNumber}*
-
-⏰ Depois de 5 minutos o pedido expira automaticamente...
+🎉 *Felicidades ao casal!* 🎉
 `;
 
-    const imagePath = path.resolve(ASSETS_DIR, "images", "casar", "pedido.jpg");
-    await sendImageFromFile(imagePath, messageText, [sender, targetLid]);
-
-    // Timer para expiração automática
-    setTimeout(async () => {
-      const stillPending = hasPendingProposal(remoteJid, targetLid);
-      if (stillPending && stillPending.senderLid === sender) {
-        removeProposal(remoteJid, targetLid);
-
-        const expiredMessage = `
-⏰ *PEDIDO EXPIRADO* ⏰
-
-O pedido de casamento de @${senderNumber} para @${targetNumber} expirou por falta de resposta! 💔
-
-Talvez na próxima... 😔
-`;
-
-        const expiredImagePath = path.resolve(
-          ASSETS_DIR,
-          "images",
-          "casar",
-          "rejeitado.jpg"
-        );
-        await sendImageFromFile(expiredImagePath, expiredMessage, [
-          sender,
-          targetLid,
-        ]);
-      }
-    }, getExpirationTime());
+    const gifPath = path.resolve(ASSETS_DIR, "images", "casar", "casar.mp4");
+    await sendGifFromFile(gifPath, messageText, [sender, targetLid]);
   },
 };
