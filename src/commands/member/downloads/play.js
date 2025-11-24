@@ -10,7 +10,7 @@ import { exec as execChild } from "node:child_process";
 import { promisify } from "node:util";
 import { PREFIX, TEMP_DIR } from "../../../config.js";
 import { getRandomName } from "../../../utils/index.js";
-import ytDlp from "yt-dlp-exec";
+// import ytDlp from "yt-dlp-exec"; // Substituído por exec do shell
 
 const exec = promisify(execChild);
 
@@ -58,7 +58,7 @@ export default {
       `⏱️ *Duração:* ${info.timestamp}\n` +
       `🔗 https://youtube.com/watch?v=${info.videoId}\n\n` +
       `⏳ Baixando e convertendo para MP3...`
-    );
+     );
 
     const videoUrl = info.url;
     const tempInput = path.join(TEMP_DIR, getRandomName("webm"));
@@ -70,24 +70,19 @@ export default {
     try {
       console.log("[DEBUG] Iniciando download via yt-dlp…");
 
-      // █████────────────────────────────
-      // ✔ CORRIGIDO: sem extractAudio
-      // █████────────────────────────────
-      await ytDlp(videoUrl, {
-        output: tempInput,
-        format: "bestaudio/best",
-        quiet: true
-      });
-
-      console.log("[DEBUG] Download concluído. Convertendo via ffmpeg…");
-
+      // Usar yt-dlp para baixar o áudio e convertê-lo diretamente para MP3 usando ffmpeg
+      // O yt-dlp cuidará da conversão para MP3 se o formato for especificado.
+      // O nome do arquivo de saída será o nome do arquivo temporário MP3.
+      // O yt-dlp usa o ffmpeg automaticamente para a conversão.
       await exec(
-        `ffmpeg -y -i "${tempInput}" -vn -ab 192k "${tempOutput}"`
+        `yt-dlp -x --audio-format mp3 -o "${tempOutput}" "${videoUrl}"`
       );
+
+      console.log("[DEBUG] Download e conversão concluídos via yt-dlp/ffmpeg.");
 
       if (!fs.existsSync(tempOutput)) {
         console.log("[DEBUG] Falha: arquivo MP3 não gerado.");
-        throw new Error("Conversão falhou.");
+        throw new Error("Download/Conversão falhou.");
       }
 
       console.log("[DEBUG] MP3 gerado com sucesso.");
@@ -101,7 +96,8 @@ export default {
       return sendTextReply("❌ Ocorreu um erro ao baixar ou converter o áudio.");
     } finally {
       console.log("[DEBUG] Limpando arquivos temporários…");
-      if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+      // O yt-dlp não cria um arquivo temporário intermediário no modo -x, então removemos a limpeza do tempInput.
+      // if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
       if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
     }
   },
