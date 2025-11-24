@@ -31,6 +31,10 @@ def download_mp3(video_url, output_path, cookies_path=None):
         }
 
         if cookies_path and os.path.exists(cookies_path):
+            # yt-dlp é muito rigoroso com o formato Netscape.
+            # O formato JSON é mais robusto e recomendado.
+            # Se o arquivo for .json, ele tentará carregar como JSON.
+            # Se for .txt, tentará carregar como Netscape.
             ydl_opts['cookiefile'] = cookies_path
             print(f"Usando cookies de: {cookies_path}", file=sys.stderr)
         
