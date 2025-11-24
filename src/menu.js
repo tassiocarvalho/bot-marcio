@@ -67,6 +67,12 @@ export function menuMessage(groupJid) {
 ▢
 ╰━━─「⭐」─━━
 
+╭━━⪩ DOWNLOAD ⪨━━
+▢
+▢ • ${prefix}play
+▢
+╰━━─「⬇️」─━━
+
 ╭━━⪩ PRINCIPAL ⪨━━
 ▢
 ▢ • ${prefix}attp
