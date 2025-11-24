@@ -69,20 +69,12 @@ export default {
   commands: ["casamento"],
   usage: `${PREFIX}casamento @usuario ou respondendo a mensagem`,
   
-handle: async ({ sendGifFromFile, sendErrorReply, sendReply, replyLid, args, isReply, sender }) => {
-  console.log('=== DEBUG CASAMENTO ===');
-  console.log('args:', args);
-  console.log('args[0]:', args[0]);
-  console.log('isReply:', isReply);
-  console.log('replyLid:', replyLid);
-  console.log('sender:', sender);
-  console.log('=======================');
-  
-  if (!args.length && !isReply) {
-    throw new InvalidParameterError(
-      "Você precisa mencionar ou marcar alguém para casar!"
-    );
-  }
+  handle: async ({ sendGifFromFile, sendErrorReply, sendReply, replyLid, args, isReply, userLid }) => {
+    if (!args.length && !isReply) {
+      throw new InvalidParameterError(
+        "Você precisa mencionar ou marcar alguém para casar!"
+      );
+    }
 
     const targetLid = isReply ? replyLid : args[0] ? `${onlyNumbers(args[0])}@lid` : null;
 
@@ -99,7 +91,7 @@ handle: async ({ sendGifFromFile, sendErrorReply, sendReply, replyLid, args, isR
       return;
     }
 
-    const senderNumber = onlyNumbers(sender);
+    const senderNumber = onlyNumbers(userLid);
     const targetNumber = onlyNumbers(targetLid);
     
     const messageText = `
@@ -111,6 +103,6 @@ handle: async ({ sendGifFromFile, sendErrorReply, sendReply, replyLid, args, isR
 `;
 
     const gifPath = path.resolve(ASSETS_DIR, "images", "casar", "casar.mp4");
-    await sendGifFromFile(gifPath, messageText, [sender, targetLid]);
+    await sendGifFromFile(gifPath, messageText, [userLid, targetLid]);
   },
 };

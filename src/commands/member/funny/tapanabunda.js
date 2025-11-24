@@ -70,16 +70,12 @@ export default {
   usage: `${PREFIX}tapanabunda @usuario ou respondendo a mensagem`,
   
   handle: async ({ sendGifFromFile, sendErrorReply, sendReply, replyLid, args, isReply, sender }) => {
-    handle: async ({ sendGifFromFile, sendErrorReply, sendReply, replyLid, args, isReply, sender }) => {
-    console.log('=== DEBUG TAPA ===');
-    console.log('sender:', sender);
-    console.log('==================');
     if (!args.length && !isReply) {
       throw new InvalidParameterError(
         "Você precisa mencionar ou marcar alguém para dar um tapa na bunda!"
       );
     }
-    }
+
     const targetLid = isReply ? replyLid : args[0] ? `${onlyNumbers(args[0])}@lid` : null;
 
     if (!targetLid) {
