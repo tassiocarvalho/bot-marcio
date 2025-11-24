@@ -101,6 +101,18 @@ export default {
 
       info = search.videos[0];
       console.log(`[PLAY] Encontrado: ${info.title}`);
+      
+      // Verifica a duração (15 minutos = 900 segundos)
+      const durationInSeconds = info.seconds;
+      const MAX_DURATION_SECONDS = 900; // 15 minutos
+
+      if (durationInSeconds > MAX_DURATION_SECONDS) {
+        const maxDurationMinutes = MAX_DURATION_SECONDS / 60;
+        return sendReply(
+          `❌ O vídeo encontrado tem ${info.timestamp} (${durationInSeconds}s). ` +
+          `O limite máximo para download de MP3 é de ${maxDurationMinutes} minutos.`
+        );
+      }
 
     } catch (e) {
       console.error("[PLAY] Erro na busca:", e);
