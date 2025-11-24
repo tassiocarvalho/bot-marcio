@@ -64,10 +64,10 @@ function isImmune(lid) {
 }
 
 export default {
-  name: "casamento",
+  name: "casar",
   description: "Casa com alguém.",
-  commands: ["casamento"],
-  usage: `${PREFIX}casamento @usuario ou respondendo a mensagem`,
+  commands: ["casar"],
+  usage: `${PREFIX}casar @usuario ou respondendo a mensagem`,
   
   handle: async ({ sendGifFromFile, sendErrorReply, sendReply, replyLid, args, isReply, userLid }) => {
     if (!args.length && !isReply) {
