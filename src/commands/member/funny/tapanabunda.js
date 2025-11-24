@@ -79,7 +79,7 @@ export default {
         "Você precisa mencionar ou marcar alguém para dar um tapa na bunda!"
       );
     }
-
+    }
     const targetLid = isReply ? replyLid : args[0] ? `${onlyNumbers(args[0])}@lid` : null;
 
     if (!targetLid) {
