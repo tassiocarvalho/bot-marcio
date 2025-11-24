@@ -102,7 +102,8 @@ export default {
     );
 
     const videoUrl = info.url;
-const tempOutputBase = path.join(TEMP_DIR, getRandomName("audio"));
+    const tempOutputBase = path.join(TEMP_DIR, getRandomName("audio"));
+    let tempOutput = null; // Declara tempOutput no escopo do try/catch/finally
 
     try {
       // Download e Conversão (tudo em um no script Python)
@@ -119,7 +120,7 @@ const tempOutputBase = path.join(TEMP_DIR, getRandomName("audio"));
       }
 
       // O script Python já retorna o caminho do MP3
-      const tempOutput = tempOutputPath;
+      tempOutput = tempOutputPath;
 
       const fileSize = fs.statSync(tempOutput).size;
       console.log(`[PLAY] ✓ MP3 pronto: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
