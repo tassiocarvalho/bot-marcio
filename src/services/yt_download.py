@@ -11,7 +11,7 @@ def download_mp3(video_url, output_path):
         # Configurações do yt-dlp
         ydl_opts = {
             'format': 'bestaudio/best',
-            'extractor_args': {'youtube': {'player_client': 'android'}},
+            'extractor_args': {'youtube': {'player_client': 'web'}},
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
