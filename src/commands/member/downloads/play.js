@@ -189,7 +189,11 @@ const DOWNLOAD_STRATEGIES = [
 // Tenta fazer download com diferentes estratégias
 async function tryDownload(videoUrl, outputPath, useProxy = true) {
   let proxy = null;
-  
+
+  // Verifica se os cookies existem
+  const hasCookies = fs.existsSync(COOKIES_PATH);
+  console.log(`[DOWNLOAD] Cookies encontrados? ${hasCookies} -> ${COOKIES_PATH}`);
+
   if (useProxy) {
     try {
       proxy = await getBestProxy();
@@ -201,7 +205,7 @@ async function tryDownload(videoUrl, outputPath, useProxy = true) {
   for (let i = 0; i < DOWNLOAD_STRATEGIES.length; i++) {
     const strategy = DOWNLOAD_STRATEGIES[i];
     
-    console.log(`[DOWNLOAD] Tentativa ${i + 1}/${DOWNLOAD_STRATEGIES.length}: ${strategy.name}${proxy ? ' + proxy' : ' sem proxy'}`);
+    console.log(`[DOWNLOAD] Tentativa ${i + 1}/${DOWNLOAD_STRATEGIES.length}: ${strategy.name}${proxy ? ' + proxy' : ''}${hasCookies ? ' + cookies' : ''}`);
 
     const baseArgs = [
       '--no-cache-dir',
@@ -219,8 +223,11 @@ async function tryDownload(videoUrl, outputPath, useProxy = true) {
       baseArgs.push(`--proxy "${proxy}"`);
     }
 
-    if (fs.existsSync(COOKIES_PATH)) {
+    if (hasCookies) {
+      // Garantindo que os cookies serão passados
       baseArgs.push(`--cookies "${COOKIES_PATH}"`);
+      // Opcional: força o client default do YouTube para evitar erro de "sign in"
+      strategy.args.push('--extractor-args "youtube:player_client=default"');
     }
 
     const ytDlpCommand = [
@@ -233,28 +240,29 @@ async function tryDownload(videoUrl, outputPath, useProxy = true) {
 
     try {
       await exec(ytDlpCommand, { timeout: 90000 });
-      
+
       if (fs.existsSync(outputPath)) {
         console.log(`[DOWNLOAD] ✓ Sucesso com ${strategy.name}!`);
         return true;
       }
     } catch (err) {
-      console.error(`[DOWNLOAD] ✗ ${strategy.name} falhou`);
-      
+      console.error(`[DOWNLOAD] ✗ ${strategy.name} falhou: ${err.message}`);
+
       // Se falhou com todas estratégias + proxy, tenta sem proxy
       if (proxy && i === DOWNLOAD_STRATEGIES.length - 1) {
         console.log("[DOWNLOAD] Tentando novamente SEM proxy...");
         return tryDownload(videoUrl, outputPath, false);
       }
-      
+
       if (i < DOWNLOAD_STRATEGIES.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
   }
-  
+
   return false;
 }
+
 
 // ============================================
 // COMANDO /PLAY
