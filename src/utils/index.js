@@ -257,17 +257,7 @@ export async function readCommandImports() {
   return commandImports;
 }
 
-// ... outras funções ...
-
-export function onlyNumbers(text) {
-  if (!text || typeof text !== 'string') {
-    return ''; // Versão nova e segura
-  }
-  return text.replace(/[^0-9]/g, "");
-}
-
-// ... outras funções ...
-
+export const onlyNumbers = (text) => text.replace(/[^0-9]/g, "");
 
 export function toUserLid(value) {
   return `${onlyNumbers(value)}@lid`;
