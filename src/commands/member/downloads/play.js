@@ -12,7 +12,7 @@ import { exec as execChild } from "node:child_process";
 import { promisify } from "node:util";
 import { PREFIX, TEMP_DIR } from "../../../config.js";
 import { getRandomName } from "../../../utils/index.js";
-const COOKIES_PATH = path.join(__dirname, "../database/youtube_cookies.json");
+const COOKIES_PATH = path.join(__dirname, "youtube_cookies.json");
 
 const exec = promisify(execChild);
 
