@@ -20,7 +20,7 @@ export default {
   commands: ["play"],
   usage: `${PREFIX}play <nome da música>`,
 
-  handle: async ({ args, sendReply, sendWaitReact, sendSuccessReact, sendFileReply, sendErrorReply }) => {
+  handle: async ({ args, sendReply, sendWaitReact, sendSuccessReact, sendFileReply, sendErrorReply }) => { // Alterado para usar sendReply e sendErrorReply
     console.log("[DEBUG] Entrou no comando /play");
 
     if (!args?.length) {
@@ -40,7 +40,7 @@ export default {
 
       if (!search.videos.length) {
         console.log("[DEBUG] yt-search não retornou vídeos.");
-        return sendReply("❌ Nenhum resultado encontrado no YouTube."); // CORRIGIDO: sendTextReply -> sendReply
+        return sendReply("❌ Nenhum resultado encontrado no YouTube.");
       }
 
       info = search.videos[0];
@@ -48,10 +48,10 @@ export default {
 
     } catch (e) {
       console.error("[ERRO] yt-search falhou:", e);
-      return sendReply("❌ Erro ao pesquisar no YouTube."); // CORRIGIDO: sendTextReply -> sendReply
+      return sendReply("❌ Erro ao pesquisar no YouTube.");
     }
 
-    await sendReply( // CORRIGIDO: sendTextReply -> sendReply
+    await sendReply(
       `🎵 *Resultado encontrado:*\n\n` +
       `📌 *Título:* ${info.title}\n` +
       `👤 *Canal:* ${info.author.name}\n` +
@@ -75,7 +75,7 @@ export default {
       // O nome do arquivo de saída será o nome do arquivo temporário MP3.
       // O yt-dlp usa o ffmpeg automaticamente para a conversão.
       await exec(
-        `yt-dlp -x --audio-format mp3 --no-check-formats --no-cache-dir -o "${tempOutput}" "${videoUrl}"`
+        `yt-dlp -x --audio-format mp3 --no-check-formats --no-cache-dir --force-ipv4 --extractor-retries 5 --extractor-args "youtube:player_client=web" -o "${tempOutput}" "${videoUrl}"`
       );
 
       console.log("[DEBUG] Download e conversão concluídos via yt-dlp/ffmpeg.");
@@ -89,13 +89,11 @@ export default {
       await sendSuccessReact();
 
       console.log("[DEBUG] Enviando arquivo ao usuário…");
-      // A função correta para enviar arquivos de áudio é sendAudioFromFile
-      const sendAudioFromFile = sendFileReply; // Mantendo a compatibilidade com o nome original
-      await sendAudioFromFile(tempOutput, false, true); // false para não ser voice, true para quoted
+      await sendFileReply(tempOutput, `${info.title}.mp3`);
 
     } catch (err) {
       console.error("[ERRO] Processo /play falhou:", err);
-      return sendErrorReply("Ocorreu um erro ao baixar ou converter o áudio."); // CORRIGIDO: sendTextReply -> sendErrorReply
+      return sendErrorReply("Ocorreu um erro ao baixar ou converter o áudio.");
     } finally {
       console.log("[DEBUG] Limpando arquivos temporários…");
       // O yt-dlp não cria um arquivo temporário intermediário no modo -x, então removemos a limpeza do tempInput.
