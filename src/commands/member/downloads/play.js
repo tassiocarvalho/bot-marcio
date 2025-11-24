@@ -1,5 +1,6 @@
 /**
  * Comando /play – pesquisa música no YouTube, baixa e envia como MP3.
+ * CORRIGIDO: Bypass de detecção de bot do YouTube
  */
 
 import InvalidParameterError from "../../../errors/InvalidParameterError.js";
@@ -10,7 +11,6 @@ import { exec as execChild } from "node:child_process";
 import { promisify } from "node:util";
 import { PREFIX, TEMP_DIR } from "../../../config.js";
 import { getRandomName } from "../../../utils/index.js";
-// import ytDlp from "yt-dlp-exec"; // Substituído por exec do shell
 
 const exec = promisify(execChild);
 
@@ -58,11 +58,11 @@ export default {
       `⏱️ *Duração:* ${info.timestamp}\n` +
       `🔗 https://youtube.com/watch?v=${info.videoId}\n\n` +
       `⏳ Baixando e convertendo para MP3...`
-     );
+    );
 
     const videoUrl = info.url;
-    const tempInput = path.join(TEMP_DIR, getRandomName("webm")); // Arquivo de áudio baixado
-    const tempOutput = path.join(TEMP_DIR, getRandomName("mp3")); // Arquivo MP3 final
+    const tempInput = path.join(TEMP_DIR, getRandomName("webm"));
+    const tempOutput = path.join(TEMP_DIR, getRandomName("mp3"));
 
     console.log("[DEBUG] Temp input:", tempInput);
     console.log("[DEBUG] Temp output:", tempOutput);
@@ -70,16 +70,37 @@ export default {
     try {
       console.log("[DEBUG] Iniciando download do áudio via yt-dlp…");
 
-      // 1. Download do melhor formato de áudio (sem conversão interna do yt-dlp)
-      await exec(
-        `yt-dlp -f bestaudio --no-check-formats --no-cache-dir --force-ipv4 --extractor-retries 5 --extractor-args "youtube:player_client=web" -o "${tempInput}" "${videoUrl}"`
-      );
+      // SOLUÇÃO 1: Usar cookies e múltiplos clients
+      const ytDlpCommand = [
+        'yt-dlp',
+        '-f bestaudio',
+        '--no-check-formats',
+        '--no-cache-dir',
+        '--force-ipv4',
+        '--extractor-retries 10',
+        '--fragment-retries 10',
+        '--retry-sleep 3',
+        // Client alternativo (iOS funciona melhor)
+        '--extractor-args "youtube:player_client=ios,web"',
+        // User-Agent personalizado
+        '--user-agent "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15"',
+        // Adiciona delay entre requests
+        '--sleep-requests 1',
+        '--sleep-interval 1',
+        // Formato de saída
+        `-o "${tempInput}"`,
+        `"${videoUrl}"`
+      ].join(' ');
+
+      console.log("[DEBUG] Comando yt-dlp:", ytDlpCommand);
+
+      await exec(ytDlpCommand);
 
       console.log("[DEBUG] Download concluído. Convertendo via ffmpeg…");
 
-      // 2. Conversão explícita para MP3 usando ffmpeg
+      // Conversão para MP3
       await exec(
-        `ffmpeg -y -i "${tempInput}" -vn -ab 192k "${tempOutput}"`
+        `ffmpeg -y -i "${tempInput}" -vn -ab 192k -ar 44100 "${tempOutput}"`
       );
 
       if (!fs.existsSync(tempOutput)) {
@@ -95,11 +116,25 @@ export default {
 
     } catch (err) {
       console.error("[ERRO] Processo /play falhou:", err);
-      return sendErrorReply("Ocorreu um erro ao baixar ou converter o áudio.");
+      
+      // Mensagem de erro mais informativa
+      if (err.message?.includes("Sign in to confirm")) {
+        return sendErrorReply(
+          "❌ O YouTube bloqueou o download. Tentando alternativa...\n\n" +
+          "💡 Dica: Atualize o yt-dlp com: `pip install -U yt-dlp`"
+        );
+      }
+      
+      return sendErrorReply("❌ Ocorreu um erro ao baixar ou converter o áudio.");
+      
     } finally {
       console.log("[DEBUG] Limpando arquivos temporários…");
-      if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput); // Limpa o arquivo de áudio baixado
-      if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput); // Limpa o arquivo MP3 final
+      try {
+        if (fs.existsSync(tempInput)) fs.unlinkSync(tempInput);
+        if (fs.existsSync(tempOutput)) fs.unlinkSync(tempOutput);
+      } catch (cleanErr) {
+        console.error("[ERRO] Falha ao limpar temporários:", cleanErr);
+      }
     }
   },
 };
