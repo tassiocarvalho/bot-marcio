@@ -1,115 +1,96 @@
-import { PREFIX } from "../../../config.js";
-import { InvalidParameterError, WarningError } from "../../../errors/index.js";
-import { SpiderXApi } from "../../../services/spider-x-api.js";
-import { Ffmpeg } from "../../../services/ffmpeg.js";
 import ytdl from "ytdl-core";
-import { createWriteStream } from "node:fs";
-import path from "node:path";
-import { TEMP_DIR } from "../../../config.js";
-import { unlink } from "node:fs/promises";
+import ytSearch from "yt-search";
+import fs from "fs";
+import path from "path";
+import { Ffmpeg } from "../services/ffmpeg.js"; // sua classe
+import { getRandomNumber } from "../utils/index.js";
+
+const ffmpeg = new Ffmpeg();
 
 export default {
-  //name: "play",
-  description: "Pesquisa e envia o áudio de um vídeo do YouTube",
-  //commands: ["play", "pa"],
-  usage: `${PREFIX}play galinha pintadinha`,
+  name: "play",
+  description: "Baixa músicas do YouTube",
+  commands: ["play"],
+  usage: "/play nome da música",
+
   /**
    * @param {CommandHandleProps} props
    */
-  handle: async ({
-    fullArgs,
-    sendReply,
-    sendWaitReact,
-    sendSuccessReact,
-    sendAudioFromFile,
-    sendErrorReply,
-  }) => {
-    if (!fullArgs.length) {
-      throw new InvalidParameterError(
-        "Você precisa me dizer o que deseja buscar!"
-      );
-    }
-
-    await sendWaitReact();
-
-    const spiderXApi = new SpiderXApi();
-    const ffmpeg = new Ffmpeg();
-    let tempWebmPath = null;
-    let finalMp3Path = null;
-
+  async handle({ message, args, client }) {
     try {
-      // 1. Busca o vídeo usando a Spider X API (para evitar bloqueio de IP)
-      const searchResults = await spiderXApi.youtubeSearch(fullArgs);
-
-      if (!searchResults.length) {
-        throw new WarningError("Nenhum vídeo encontrado para sua pesquisa.");
+      if (!args.length) {
+        return message.reply("Digite algo para pesquisar. Exemplo:\n/play faded");
       }
 
-      const firstVideo = searchResults[0];
-      const videoUrl = firstVideo.url;
-      const videoId = firstVideo.url.split("v=")[1];
+      const query = args.join(" ");
 
-      // 2. Exibir as informações do vídeo antes de baixar
-      const infoMessage = `
-*Vídeo Encontrado:*
+      await message.reply("🎵 Procurando música...");
 
-*Título:* ${firstVideo.title}
-*Canal:* ${firstVideo.author}
-*Duração:* ${firstVideo.duration}
-*Views:* ${firstVideo.views}
-*Link:* ${videoUrl}
+      // 1️⃣ PESQUISA NO YOUTUBE (SEM LOGIN)
+      const result = await ytSearch(query);
+      if (!result || !result.videos || result.videos.length === 0) {
+        return message.reply("Nenhum vídeo encontrado.");
+      }
 
-*Iniciando download e conversão para MP3...*
-`;
-      await sendReply(infoMessage);
+      const video = result.videos[0]; // pegar o primeiro
 
-      // 3. Baixar o áudio usando ytdl-core (mais simples e sem cookies)
-      tempWebmPath = path.join(TEMP_DIR, `${videoId}_temp.webm`);
+      // 2️⃣ Enviar detalhes do vídeo
+      await message.reply(
+        `🎧 *Resultado encontrado:*\n\n` +
+          `📌 *Título:* ${video.title}\n` +
+          `📀 *Canal:* ${video.author.name}\n` +
+          `⏱ *Duração:* ${video.timestamp}\n` +
+          `👀 *Views:* ${video.views}\n\n` +
+          `🔗 ${video.url}\n\n` +
+          `🎶 Baixando o áudio...`
+      );
 
-      const stream = ytdl(videoUrl, {
-        quality: 'highestaudio',
-        filter: 'audioonly'
+      // 3️⃣ Caminho temporário
+      const tempInput = path.join(
+        ffmpeg.tempDir,
+        `${getRandomNumber(10000, 99999)}.webm`
+      );
+
+      const tempOutputMp3 = path.join(
+        ffmpeg.tempDir,
+        `${getRandomNumber(10000, 99999)}.mp3`
+      );
+
+      // 4️⃣ BAIXA O ÁUDIO EM FORMATO WEBM
+      const audio = ytdl(video.url, {
+        filter: "audioonly",
+        quality: "highestaudio",
       });
 
-      const fileStream = createWriteStream(tempWebmPath);
+      // Salvar o arquivo WEBM temporário
+      const writeStream = fs.createWriteStream(tempInput);
+      audio.pipe(writeStream);
 
       await new Promise((resolve, reject) => {
-        stream.pipe(fileStream);
-        stream.on("error", reject);
-        fileStream.on("finish", resolve);
-        fileStream.on("error", reject);
+        audio.on("end", resolve);
+        audio.on("error", reject);
       });
 
-      // 4. Converter o arquivo temporário para MP3 usando FFmpeg
-      finalMp3Path = await ffmpeg.convertToMp3(tempWebmPath);
+      // 5️⃣ CONVERTER PARA MP3
+      const mp3Path = await ffmpeg.convertToMp3(tempInput);
 
-      // 5. Enviar o MP3 final
-      await sendAudioFromFile(finalMp3Path, true, true);
-      await sendSuccessReact();
-    } catch (error) {
-      console.error("Erro no comando /play (ytdl-core + FFmpeg):", error);
-      
-      let errorMessage = "Ocorreu um erro ao processar sua solicitação de áudio.";
-      
-      if (error.message.includes("FFmpeg not found") || error.message.includes("FFmpeg failed")) {
-          errorMessage = `❌ Erro de Conversão: ${error.message}. Verifique se o FFmpeg está instalado corretamente.`;
-      } else if (error.message.includes("status code 403") || error.message.includes("status code 410")) {
-          errorMessage = `❌ Erro de Download: O vídeo está bloqueado, privado ou indisponível.`;
-      } else if (error instanceof WarningError) {
-          throw error; // Propaga erros amigáveis da Spider X API
-      } else {
-          errorMessage = `❌ Erro Desconhecido: ${error.message}`;
-      }
-      
-      throw new WarningError(errorMessage);
-    } finally {
-      // 6. Limpar arquivos temporários
-      try {
-        if (tempWebmPath) await unlink(tempWebmPath);
-        if (finalMp3Path) await unlink(finalMp3Path);
-      } catch (e) {
-        console.error("Erro ao deletar arquivos temporários:", e);
-      }
+      // 6️⃣ ENVIAR PARA O USUÁRIO
+      await client.sendMessage(message.from, {
+        audio: {
+          url: mp3Path,
+        },
+        mimetype: "audio/mpeg",
+      });
+
+      // 7️⃣ LIMPAR ARQUIVOS
+      fs.unlinkSync(tempInput);
+      fs.unlinkSync(mp3Path);
+
+      return;
+
+    } catch (err) {
+      console.error(err);
+      return message.reply("❌ Ocorreu um erro ao tentar processar o áudio.");
     }
   },
 };
