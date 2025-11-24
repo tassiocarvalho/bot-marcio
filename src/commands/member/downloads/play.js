@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { exec as execChild } from "node:child_process";
 import { promisify } from "node:util";
-import { PREFIX, TEMP_DIR } from "../../config.js";
+import { PREFIX } from "../../../config.js";
 import { InvalidParameterError } from "../../errors/index.js";
 import { getRandomName } from "../../utils/index.js";
 import { ytDlp } from "yt-dlp-exec"; // você já instalou
