@@ -20,8 +20,7 @@ ${PREFIX}hidtag (respondendo uma mensagem de texto)`,
     remoteJid, 
     sendReact,
     isReply,
-    replyMessage,
-    webMessage // Adicione esta prop se existir
+    webMessage
   }) => {
     const { participants } = await socket.groupMetadata(remoteJid);
     const mentions = participants.map(({ id }) => id);
@@ -30,36 +29,21 @@ ${PREFIX}hidtag (respondendo uma mensagem de texto)`,
 
     let msgParaEnviar = "";
 
-    // ----- DEBUG: Veja a estrutura completa -----
-    if (isReply) {
-      console.log("=== DEBUG REPLY MESSAGE ===");
-      console.log("isReply:", isReply);
-      console.log("replyMessage:", JSON.stringify(replyMessage, null, 2));
-      console.log("webMessage:", JSON.stringify(webMessage, null, 2));
-      console.log("========================");
-    }
-
     // ----- 1. Se respondeu uma mensagem (isReply) -----
-    if (isReply && replyMessage) {
-      // Tentativas de pegar o texto
+    if (isReply && webMessage?.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+      const quotedMsg = webMessage.message.extendedTextMessage.contextInfo.quotedMessage;
+      
+      // Tenta extrair o texto da mensagem citada
       const textoDaMensagem = 
-        replyMessage.conversation || 
-        replyMessage.extendedTextMessage?.text ||
-        replyMessage.text ||
-        replyMessage.message?.conversation ||
-        replyMessage.message?.extendedTextMessage?.text ||
-        replyMessage.imageMessage?.caption ||
-        replyMessage.videoMessage?.caption;
+        quotedMsg.conversation || 
+        quotedMsg.extendedTextMessage?.text ||
+        quotedMsg.imageMessage?.caption ||
+        quotedMsg.videoMessage?.caption;
 
       if (textoDaMensagem) {
         msgParaEnviar = textoDaMensagem;
       } else {
-        // Mostra a estrutura para debug
-        return await sendText(
-          `❗ Marque uma mensagem **de texto**!\n\n` +
-          `DEBUG: Verifique o console para ver a estrutura da mensagem.`,
-          mentions
-        );
+        return await sendText("❗ Marque uma mensagem **de texto**!", mentions);
       }
     }
     // ----- 2. Se escreveu algo após o comando -----
