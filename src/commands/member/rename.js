@@ -76,12 +76,14 @@ export default {
       if (isAnimated) {
         finalStickerPath = await processAnimatedSticker(
           inputPath,
-          metadata
+          metadata,
+          addStickerMetadata
         );
       } else {
         finalStickerPath = await processStaticSticker(
           inputPath,
-          metadata
+          metadata,
+          addStickerMetadata
         );
       }
 
