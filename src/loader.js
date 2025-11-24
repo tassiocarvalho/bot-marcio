@@ -12,6 +12,24 @@ import { badMacHandler } from "./utils/badMacHandler.js";
 import { errorLog } from "./utils/logger.js";
 
 export function load(socket) {
+
+  // ⬇️⬇️⬇️ ADIÇÃO NECESSÁRIA – NÃO APAGA NADA DO SEU CÓDIGO
+  // implementando sendTextReply que falta
+  socket.sendTextReply = async (m, text) => {
+    try {
+      console.log("[DEBUG] sendTextReply executando...");
+      return await socket.sendMessage(
+        m.key.remoteJid,
+        { text },
+        { quoted: m }
+      );
+    } catch (err) {
+      console.error("[DEBUG] Erro em sendTextReply:", err);
+    }
+  };
+  // ⬆️⬆️⬆️ FIM DA ADIÇÃO – resto igual
+  
+
   const safeEventHandler = async (callback, data, eventName) => {
     try {
       await callback(data);
