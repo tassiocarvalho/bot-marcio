@@ -3,7 +3,7 @@ import { PREFIX } from "../../config.js";
 export default {
   name: "entreaqui",
   description: "Este comando marcará todos do grupo",
-  commands: ["entreaqui", "entreaqui", "entreaqui"],
+  commands: ["entreaqui"],
   usage: `${PREFIX}hidtag motivo
 
 ou
