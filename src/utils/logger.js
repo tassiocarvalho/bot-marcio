@@ -22,7 +22,7 @@ export function successLog(message) {
 }
 
 export function errorLog(message) {
-  console.log("\x1b[31m[TASSIO BOT| ERROR]\x1b[0m", message);
+  console.log("\x1b[31m[TASSIO BOT | ERROR]\x1b[0m", message);
 }
 
 export function warningLog(message) {

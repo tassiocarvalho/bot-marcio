@@ -351,13 +351,13 @@ describe("Utility Functions", () => {
   describe("getRandomName", () => {
     it("should generate name without extension", () => {
       const name = utils.getRandomName();
-      assert.ok(name.startsWith("takeshi_temp_"));
+      assert.ok(name.startsWith("tassio_temp_"));
       assert.ok(!name.includes("."));
     });
 
     it("should generate name with extension", () => {
       const name = utils.getRandomName("jpg");
-      assert.ok(name.startsWith("takeshi_temp_"));
+      assert.ok(name.startsWith("tassio_temp_"));
       assert.ok(name.endsWith(".jpg"));
     });
 
