@@ -50,22 +50,24 @@ class Ffmpeg {
     let command;
 
     if (isVideo) {
-      // Lógica OTIMIZADA para vídeo (evita corte antes do fim)
-      // 1. fps=10: Reduz quadros para economizar espaço
-      // 2. scale=512:512:force_original...: Redimensiona sem esticar
-      // 3. q:v 40 e lossless 0: Qualidade média para caber mais tempo em 1MB
+      // MODO ULTRA ECONÔMICO PARA NÃO CORTAR O VÍDEO
+      // - an: Remove áudio (garantia, pois áudio ocupa espaço inútil em sticker)
+      // - fps=8: Reduzimos para 8 frames por segundo
+      // - q:v 15: Qualidade baixa (lossy) para forçar o tamanho a ser pequeno
+      // - compression_level 6: O FFmpeg vai demorar uns milissegundos a mais, mas vai espremer o arquivo
+      
       command = `ffmpeg -y -i "${inputPath}" ` +
         `-vcodec libwebp ` +
-        `-filter_complex "[0:v] scale=512:512:force_original_aspect_ratio=decrease, fps=10, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" ` +
-        `-loop 0 -lossless 0 -q:v 40 ` +
+        `-filter_complex "[0:v] scale=512:512:force_original_aspect_ratio=decrease, fps=8, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" ` +
+        `-loop 0 -an -vsync 0 ` +
+        `-preset picture ` + 
+        `-q:v 15 ` +  
+        `-compression_level 6 ` +
         `-fs 0.99M ` + 
         `"${outputPath}"`;
+        
     } else {
-      // Lógica para imagem estática
-      command = `ffmpeg -i "${inputPath}" ` +
-        `-vf "scale=512:512:force_original_aspect_ratio=decrease" ` +
-        `-f webp -quality 90 ` +
-        `"${outputPath}"`;
+       // ... (mantenha o código de imagem igual estava)
     }
 
     await this._executeCommand(command);
