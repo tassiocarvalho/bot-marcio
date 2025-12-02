@@ -23,7 +23,6 @@ class Ffmpeg {
             errorLog("FFmpeg não encontrado. Certifique-se de que está instalado e no PATH.");
             return reject(new Error("FFmpeg não está instalado ou acessível."));
           }
-          // Loga o erro exato do FFmpeg para debug
           errorLog(`FFmpeg Execution Error: ${stderr}`);
           return reject(new Error(`FFmpeg failed: ${stderr}`));
         }
@@ -41,21 +40,14 @@ class Ffmpeg {
 
   /**
    * Cria uma figurinha (WebP) a partir de imagem ou vídeo.
-   * Já inclui as otimizações para vídeos de até 10s não serem cortados.
-   * @param {string} inputPath Caminho do arquivo de entrada
-   * @param {boolean} isVideo Define se a entrada é um vídeo/gif
+   * OTIMIZADO: Configuração agressiva para evitar cortes em vídeos de 10s.
    */
   async createSticker(inputPath, isVideo = false) {
     const outputPath = await this._createTempFilePath("webp");
     let command;
 
     if (isVideo) {
-      // MODO ULTRA ECONÔMICO PARA NÃO CORTAR O VÍDEO
-      // - an: Remove áudio (garantia, pois áudio ocupa espaço inútil em sticker)
-      // - fps=8: Reduzimos para 8 frames por segundo
-      // - q:v 15: Qualidade baixa (lossy) para forçar o tamanho a ser pequeno
-      // - compression_level 6: O FFmpeg vai demorar uns milissegundos a mais, mas vai espremer o arquivo
-      
+      // Configuração para caber 10s em 1MB
       command = `ffmpeg -y -i "${inputPath}" ` +
         `-vcodec libwebp ` +
         `-filter_complex "[0:v] scale=512:512:force_original_aspect_ratio=decrease, fps=8, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" ` +
@@ -65,10 +57,29 @@ class Ffmpeg {
         `-compression_level 6 ` +
         `-fs 0.99M ` + 
         `"${outputPath}"`;
-        
     } else {
-       // ... (mantenha o código de imagem igual estava)
+      command = `ffmpeg -i "${inputPath}" ` +
+        `-vf "scale=512:512:force_original_aspect_ratio=decrease" ` +
+        `-f webp -quality 90 ` +
+        `"${outputPath}"`;
     }
+
+    await this._executeCommand(command);
+    return outputPath;
+  }
+
+  /**
+   * NOVO: Converte Sticker (WebP) para GIF.
+   * Necessário para o comando /togif funcionar.
+   */
+  async convertStickerToGif(inputPath) {
+    const outputPath = await this._createTempFilePath("gif");
+    
+    // Converte usando palettegen para melhor qualidade visual
+    const command = `ffmpeg -i "${inputPath}" ` +
+      `-vf "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" ` +
+      `-f gif ` +
+      `"${outputPath}"`;
 
     await this._executeCommand(command);
     return outputPath;
@@ -111,7 +122,6 @@ class Ffmpeg {
 
   async convertToMp3(inputPath) {
     const outputPath = await this._createTempFilePath("mp3");
-    // Melhoria: Usar libmp3lame para arquivos .mp3 reais (aac é para .m4a)
     const command = `ffmpeg -i ${inputPath} -vn -acodec libmp3lame -b:a 192k ${outputPath}`;
     await this._executeCommand(command);
     return outputPath;
