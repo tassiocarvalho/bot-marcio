@@ -1,6 +1,6 @@
 /**
  * Desenvolvido por: Dev Gui
- * Módulo Fig10 - Corta vídeos longos em várias figurinhas
+ * Módulo Fig10 - Versão Estável (Corte -> Conversão)
  */
 import fs from "node:fs";
 import { BOT_EMOJI, BOT_NAME, PREFIX } from "../../config.js";
@@ -25,19 +25,16 @@ export default {
     userLid,
   }) => {
     
-    // 1. Validação básica
     if (!isVideo) {
       throw new InvalidParameterError("Este comando serve apenas para vídeos/GIFs!");
     }
 
-    // 2. Obter a duração do vídeo (Metadados do WhatsApp)
     const videoSeconds =
       webMessage.message?.videoMessage?.seconds ||
       webMessage.message?.extendedTextMessage?.contextInfo?.quotedMessage?.videoMessage?.seconds || 
       0;
 
-    // Regra: Se passar de 59.5s, recusa.
-    if (videoSeconds > 59.5) {
+    if (videoSeconds > 60) {
       return sendErrorReply("O vídeo é muito longo! O limite máximo é 60 segundos.");
     }
 
@@ -47,37 +44,31 @@ export default {
     const ffmpegService = new Ffmpeg();
     let inputPath = null;
     
-    // Lista para guardar os caminhos das figurinhas geradas para limpar depois
-    const createdStickers = [];
+    // Arrays para limpeza posterior
+    const tempFilesToDelete = [];
 
     try {
-      // 3. Download do Vídeo
       inputPath = await downloadVideo(webMessage, getRandomName());
+      tempFilesToDelete.push(inputPath);
 
-      // 4. Lógica de Divisão
-      const CHUNK_DURATION = 8.5; // Tamanho de cada corte
+      const CHUNK_DURATION = 8.5; 
       const totalParts = Math.ceil(videoSeconds / CHUNK_DURATION);
-
-      // Se o vídeo for muito curto (menos que 8.5s), trata como 1 parte
       const finalParts = totalParts > 0 ? totalParts : 1;
 
-      // Loop para criar e enviar cada parte
       for (let i = 0; i < finalParts; i++) {
         const startTime = i * CHUNK_DURATION;
         
-        // --- Criação ---
-        // Chama o método atualizado passando o tempo de início e duração
-        const stickerPath = await ffmpegService.createSticker(
-          inputPath, 
-          true,        // isVideo
-          startTime,   // start
-          CHUNK_DURATION // duration
-        );
-        
-        createdStickers.push(stickerPath);
+        // --- PASSO 1: CORTAR O VÍDEO ---
+        // Gera um arquivo .mp4 pequeno e perfeito
+        const cutPath = await ffmpegService.cutVideo(inputPath, startTime, CHUNK_DURATION);
+        tempFilesToDelete.push(cutPath);
 
-        // --- Metadados ---
-        // Personaliza o pacote: "Nome do Bot (1/4)"
+        // --- PASSO 2: CONVERTER O CORTE PARA STICKER ---
+        // O createSticker agora recebe um vídeo que já começa no tempo 0
+        const stickerPath = await ffmpegService.createSticker(cutPath, true);
+        tempFilesToDelete.push(stickerPath);
+
+        // --- PASSO 3: METADADOS E ENVIO ---
         const metadata = {
           username: username,
           botName: `${BOT_EMOJI} ${BOT_NAME} (${i + 1}/${finalParts})`,
@@ -86,16 +77,14 @@ export default {
         const stickerBuffer = await fs.promises.readFile(stickerPath);
         const stickerWithMeta = await addStickerMetadata(stickerBuffer, metadata);
         
-        // Salvamos o arquivo final temporário
         const finalStickerPath = stickerPath + ".tmp.webp";
         fs.writeFileSync(finalStickerPath, stickerWithMeta);
-        createdStickers.push(finalStickerPath);
+        tempFilesToDelete.push(finalStickerPath);
 
-        // --- Envio ---
         await sendStickerFromFile(finalStickerPath);
         
-        // Pequena pausa para garantir a ordem de envio no WhatsApp
-        await new Promise(r => setTimeout(r, 1000));
+        // Pausa leve para o WhatsApp processar a ordem
+        await new Promise(r => setTimeout(r, 1500));
       }
 
       await sendSuccessReact();
@@ -104,12 +93,8 @@ export default {
       console.error("Erro no fig10:", error);
       await sendErrorReply("Erro ao processar o vídeo longo.");
     } finally {
-      // 5. Limpeza Geral
-      if (inputPath && fs.existsSync(inputPath)) {
-        fs.unlinkSync(inputPath);
-      }
-      // Deleta todas as figurinhas temporárias criadas no loop
-      createdStickers.forEach(path => {
+      // Limpeza robusta de todos os arquivos gerados
+      tempFilesToDelete.forEach(path => {
         if (fs.existsSync(path)) fs.unlinkSync(path);
       });
     }
