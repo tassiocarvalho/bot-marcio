@@ -53,13 +53,18 @@ class Ffmpeg {
   /**
    * Cria Sticker (WebP) - Otimizado para não cortar vídeos
    */
-  async createSticker(inputPath, isVideo = false) {
+  async createSticker(inputPath, isVideo = false, startTime = 0, duration = null) {
     const outputPath = await this._createTempFilePath("webp");
     let command;
 
     if (isVideo) {
-      // Configuração para caber ~10s em 1MB
-      command = `ffmpeg -y -i "${inputPath}" ` +
+      // Monta as opções de corte (se existirem)
+      // -ss: Pula para o segundo X
+      // -t: Dura Y segundos
+      const seekOptions = duration ? `-ss ${startTime} -t ${duration}` : "";
+
+      // Inserimos o seekOptions ANTES do -i para ser mais rápido e preciso no corte
+      command = `ffmpeg -y ${seekOptions} -i "${inputPath}" ` +
         `-vcodec libwebp ` +
         `-filter_complex "[0:v] scale=512:512:force_original_aspect_ratio=decrease, fps=8, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" ` +
         `-loop 0 -an -vsync 0 ` +
