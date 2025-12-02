@@ -1,6 +1,6 @@
 /**
  * Desenvolvido por: Dev Gui
- * Módulo Fig10 - Versão Estável (Corte -> Conversão)
+ * Módulo Fig10 - Versão Sharp (Correção de Figurinha Corrompida)
  */
 import fs from "node:fs";
 import { BOT_EMOJI, BOT_NAME, PREFIX } from "../../config.js";
@@ -43,32 +43,27 @@ export default {
     const username = webMessage.pushName || webMessage.notifyName || userLid.replace(/@lid/, "");
     const ffmpegService = new Ffmpeg();
     let inputPath = null;
-    
-    // Arrays para limpeza posterior
-    const tempFilesToDelete = [];
+    const tempFiles = [];
 
     try {
       inputPath = await downloadVideo(webMessage, getRandomName());
-      tempFilesToDelete.push(inputPath);
+      tempFiles.push(inputPath);
 
-      const CHUNK_DURATION = 8.5; 
+      // Duração de cada figurinha
+      const CHUNK_DURATION = 8.0; 
       const totalParts = Math.ceil(videoSeconds / CHUNK_DURATION);
       const finalParts = totalParts > 0 ? totalParts : 1;
 
       for (let i = 0; i < finalParts; i++) {
         const startTime = i * CHUNK_DURATION;
         
-        // --- PASSO 1: CORTAR O VÍDEO ---
-        // Gera um arquivo .mp4 pequeno e perfeito
-        const cutPath = await ffmpegService.cutVideo(inputPath, startTime, CHUNK_DURATION);
-        tempFilesToDelete.push(cutPath);
+        // --- A MÁGICA ---
+        // Chama a função nova que usa FFmpeg (Corte) + Sharp (Conversão)
+        // Isso retorna o caminho de um .webp válido e não corrompido
+        const stickerPath = await ffmpegService.cutVideoToWebP(inputPath, startTime, CHUNK_DURATION);
+        tempFiles.push(stickerPath);
 
-        // --- PASSO 2: CONVERTER O CORTE PARA STICKER ---
-        // O createSticker agora recebe um vídeo que já começa no tempo 0
-        const stickerPath = await ffmpegService.createSticker(cutPath, true);
-        tempFilesToDelete.push(stickerPath);
-
-        // --- PASSO 3: METADADOS E ENVIO ---
+        // Adiciona Metadados
         const metadata = {
           username: username,
           botName: `${BOT_EMOJI} ${BOT_NAME} (${i + 1}/${finalParts})`,
@@ -77,13 +72,14 @@ export default {
         const stickerBuffer = await fs.promises.readFile(stickerPath);
         const stickerWithMeta = await addStickerMetadata(stickerBuffer, metadata);
         
-        const finalStickerPath = stickerPath + ".tmp.webp";
+        const finalStickerPath = stickerPath + ".final.webp";
         fs.writeFileSync(finalStickerPath, stickerWithMeta);
-        tempFilesToDelete.push(finalStickerPath);
+        tempFiles.push(finalStickerPath);
 
+        // Envia
         await sendStickerFromFile(finalStickerPath);
         
-        // Pausa leve para o WhatsApp processar a ordem
+        // Pausa de segurança para o WhatsApp não inverter a ordem
         await new Promise(r => setTimeout(r, 1500));
       }
 
@@ -91,10 +87,11 @@ export default {
 
     } catch (error) {
       console.error("Erro no fig10:", error);
-      await sendErrorReply("Erro ao processar o vídeo longo.");
+      await sendErrorReply("Erro ao processar o vídeo. Tente um vídeo mais curto ou leve.");
     } finally {
-      // Limpeza robusta de todos os arquivos gerados
-      tempFilesToDelete.forEach(path => {
+      // Limpeza
+      if (inputPath && fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+      tempFiles.forEach(path => {
         if (fs.existsSync(path)) fs.unlinkSync(path);
       });
     }
