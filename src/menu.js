@@ -88,7 +88,8 @@ export function menuMessage(groupJid) {
 ▢ • ${prefix}rename
 ▢ • ${prefix}sticker
 ▢ • ${prefix}suporte
-▢ • ${prefix}to-image
+▢ • ${prefix}togif
+▢ • ${prefix}toimg
 ▢ • ${prefix}to-mp3
 ▢ • ${prefix}ttp
 ▢ • ${prefix}yt-search
