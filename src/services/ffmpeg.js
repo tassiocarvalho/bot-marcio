@@ -58,21 +58,30 @@ class Ffmpeg {
     let command;
 
     if (isVideo) {
-      // CORREÇÃO: seekOptions agora é aplicado DEPOIS da entrada
-      // Isso é mais lento, mas garante que o frame inicial exista (evita sticker cinza)
-      const seekOptions = duration ? `-ss ${startTime} -t ${duration}` : "";
+      // DEFININDO O FILTRO DE CORTE
+      // Se tiver duração (fig10), usamos 'trim' e resetamos o tempo (setpts)
+      // Se não (sticker normal), apenas redimensionamos.
+      let filterStart = "";
+      
+      if (duration) {
+         // trim: Corta o vídeo
+         // setpts=PTS-STARTPTS: Reseta o cronômetro do vídeo para 0.0s (ESSENCIAL)
+         filterStart = `trim=start=${startTime}:duration=${duration},setpts=PTS-STARTPTS,`;
+      }
 
+      // Montagem do comando
       command = `ffmpeg -y -i "${inputPath}" ` +
-        `${seekOptions} ` + // O tempo entra aqui agora
         `-vcodec libwebp ` +
-        `-filter_complex "[0:v] scale=512:512:force_original_aspect_ratio=decrease, fps=8, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" ` +
+        // Note que o ${filterStart} entra antes do scale
+        `-filter_complex "[0:v] ${filterStart} scale=512:512:force_original_aspect_ratio=decrease, fps=8, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" ` +
         `-loop 0 -an -vsync 0 ` +
-        `-map_metadata -1 ` + // Remove metadados do vídeo original para não corromper o WebP
+        `-map_metadata -1 ` +
         `-preset picture ` + 
         `-q:v 15 ` +  
         `-compression_level 6 ` +
         `-fs 0.99M ` + 
         `"${outputPath}"`;
+
     } else {
       command = `ffmpeg -i "${inputPath}" ` +
         `-vf "scale=512:512:force_original_aspect_ratio=decrease" ` +
@@ -83,7 +92,6 @@ class Ffmpeg {
     await this._executeCommand(command);
     return outputPath;
   }
-
   /**
    * Converte Sticker Animado para MP4 (via Sharp -> GIF -> FFmpeg)
    * Resolve o erro "unsupported chunk: ANIM" do Debian
