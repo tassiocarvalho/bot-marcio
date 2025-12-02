@@ -39,6 +39,39 @@ class Ffmpeg {
     );
   }
 
+  /**
+   * Cria uma figurinha (WebP) a partir de imagem ou vídeo.
+   * Já inclui as otimizações para vídeos de até 10s não serem cortados.
+   * @param {string} inputPath Caminho do arquivo de entrada
+   * @param {boolean} isVideo Define se a entrada é um vídeo/gif
+   */
+  async createSticker(inputPath, isVideo = false) {
+    const outputPath = await this._createTempFilePath("webp");
+    let command;
+
+    if (isVideo) {
+      // Lógica OTIMIZADA para vídeo (evita corte antes do fim)
+      // 1. fps=10: Reduz quadros para economizar espaço
+      // 2. scale=512:512:force_original...: Redimensiona sem esticar
+      // 3. q:v 40 e lossless 0: Qualidade média para caber mais tempo em 1MB
+      command = `ffmpeg -y -i "${inputPath}" ` +
+        `-vcodec libwebp ` +
+        `-filter_complex "[0:v] scale=512:512:force_original_aspect_ratio=decrease, fps=10, split [a][b]; [a] palettegen=reserve_transparent=on:transparency_color=ffffff [p]; [b][p] paletteuse" ` +
+        `-loop 0 -lossless 0 -q:v 40 ` +
+        `-fs 0.99M ` + 
+        `"${outputPath}"`;
+    } else {
+      // Lógica para imagem estática
+      command = `ffmpeg -i "${inputPath}" ` +
+        `-vf "scale=512:512:force_original_aspect_ratio=decrease" ` +
+        `-f webp -quality 90 ` +
+        `"${outputPath}"`;
+    }
+
+    await this._executeCommand(command);
+    return outputPath;
+  }
+
   async applyBlur(inputPath, intensity = "7:5") {
     const outputPath = await this._createTempFilePath();
     const command = `ffmpeg -i ${inputPath} -vf boxblur=${intensity} ${outputPath}`;
@@ -74,16 +107,10 @@ class Ffmpeg {
     return outputPath;
   }
 
-  /**
-   * Converte um arquivo de áudio para MP3.
-   * Usa o codec aac e bitrate fixo para maior compatibilidade.
-   * @param {string} inputPath Caminho do arquivo de entrada (ex: .webm, .m4a)
-   * @returns {Promise<string>} Caminho do arquivo MP3 de saída
-   */
   async convertToMp3(inputPath) {
     const outputPath = await this._createTempFilePath("mp3");
-    // Comando mais universal: -acodec aac é mais comum que libmp3lame
-    const command = `ffmpeg -i ${inputPath} -vn -acodec aac -b:a 192k ${outputPath}`;
+    // Melhoria: Usar libmp3lame para arquivos .mp3 reais (aac é para .m4a)
+    const command = `ffmpeg -i ${inputPath} -vn -acodec libmp3lame -b:a 192k ${outputPath}`;
     await this._executeCommand(command);
     return outputPath;
   }
