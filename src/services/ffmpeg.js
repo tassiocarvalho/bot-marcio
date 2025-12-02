@@ -72,19 +72,27 @@ class Ffmpeg {
    * NOVO: Converte Sticker (WebP) para GIF.
    * Necessário para o comando /togif funcionar.
    */
+/**
+   * Converte Sticker (WebP) para Vídeo MP4 (que será enviado como GIF).
+   * Correção: Usa MP4 em vez de GIF real para evitar erro de "Chunk ANIM" 
+   * e reduzir drasticamente o tamanho do arquivo.
+   */
   async convertStickerToGif(inputPath) {
-    const outputPath = await this._createTempFilePath("gif");
+    const outputPath = await this._createTempFilePath("mp4");
     
-    // Converte usando palettegen para melhor qualidade visual
+    // 1. -vf "scale=..." garante dimensões pares (obrigatório para MP4/H264)
+    // 2. -pix_fmt yuv420p garante compatibilidade com WhatsApp
+    // 3. -movflags faststart otimiza para web
     const command = `ffmpeg -i "${inputPath}" ` +
-      `-vf "split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" ` +
-      `-f gif ` +
+      `-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" ` +
+      `-c:v libx264 -preset fast -crf 26 ` +
+      `-pix_fmt yuv420p ` +
+      `-movflags faststart ` +
       `"${outputPath}"`;
 
     await this._executeCommand(command);
     return outputPath;
   }
-
   async applyBlur(inputPath, intensity = "7:5") {
     const outputPath = await this._createTempFilePath();
     const command = `ffmpeg -i ${inputPath} -vf boxblur=${intensity} ${outputPath}`;
