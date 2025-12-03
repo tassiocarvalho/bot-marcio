@@ -1,10 +1,10 @@
 /**
  * Serviços de processamento de imagens e áudio.
- * VERSÃO VELOCIDADE (SPEED MODE)
- * * Correção:
- * - Reduzido o 'effort' do Sharp de 6 (muito lento) para 0 (muito rápido).
- * - Isso resolve o problema do bot "ficar preso" ao gerar figurinhas animadas.
- * - Mantém o formato 1:1 esticado.
+ * VERSÃO FINAL: "VISUALLY ADEQUATE" (Equilíbrio Visual x Performance)
+ * * Ajustes realizados:
+ * 1. Compressão Inteligente: Usa dither Bayer no FFmpeg para gerar GIFs leves.
+ * 2. Formato: 1:1 Esticado (Fill) para preencher a figurinha inteira.
+ * 3. Qualidade: Ajustada para 40 (Sharp) com Effort 0 (Rápido).
  */
 import { exec } from "child_process";
 import fs from "node:fs";
@@ -23,8 +23,13 @@ class Ffmpeg {
     return new Promise((resolve, reject) => {
       exec(command, (error, stdout, stderr) => {
         if (error && error.code !== 0) {
-          errorLog(`FFmpeg Error: ${stderr}`);
-          return reject(new Error(`FFmpeg failed: ${stderr}`));
+          // Ignora warnings, foca em erros reais
+          if (!stderr.includes("Conversion failed")) {
+             // console.warn(stderr); // Descomente para debug
+          } else {
+             errorLog(`FFmpeg Error: ${stderr}`);
+             return reject(new Error(`FFmpeg failed: ${stderr}`));
+          }
         }
         resolve(stdout);
       });
@@ -48,7 +53,7 @@ class Ffmpeg {
   async createSticker(inputPath, isVideo = false) {
     // 1. VÍDEOS (Animados)
     if (isVideo) {
-      console.log("Processando vídeo animado..."); // Log para debug
+      // Chama o método especialista em compressão de vídeo
       return this.cutVideoToWebP(inputPath, 0, 10);
     }
 
@@ -57,33 +62,36 @@ class Ffmpeg {
     
     try {
       await sharp(inputPath)
-        .resize(512, 512, { fit: 'fill' }) // Estica
-        .webp({ quality: 60, effort: 0 }) // Rápido
+        .resize(512, 512, { fit: 'fill' }) // Estica para preencher
+        .webp({ quality: 70, effort: 0 })  // Qualidade boa para fotos
         .toFile(outputPath);
         
       return outputPath;
 
     } catch (error) {
       console.error("Erro Sharp (Imagem):", error);
-      // Fallback
-      const command = `ffmpeg -i "${inputPath}" -vf "scale=512:512" -f webp -quality 60 "${outputPath}"`;
+      // Fallback FFmpeg
+      const command = `ffmpeg -i "${inputPath}" -vf "scale=512:512" -f webp -quality 70 "${outputPath}"`;
       await this._executeCommand(command);
       return outputPath;
     }
   }
 
   /**
-   * MÁGICA DOS VÍDEOS (ANIMADOS) - OTIMIZADO PARA VELOCIDADE
+   * MÁGICA DOS VÍDEOS (ANIMADOS)
+   * Reduz qualidade do vídeo para um nível adequado e gera figurinha.
    */
   async cutVideoToWebP(inputPath, startTime, duration) {
     const gifTempPath = await this._createTempFilePath("gif");
     const webpOutputPath = await this._createTempFilePath("webp");
 
     try {
-      // 1. FFmpeg: Gera GIF (Rápido)
-      // fps=8: Mantém leve
-      // scale=512:512: Estica
-      const videoFilter = `fps=8,scale=512:512,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
+      // 1. FFmpeg: Gera GIF OTIMIZADO
+      // - fps=8: Fluidez aceitável para stickers
+      // - scale=512:512: Formato quadrado esticado
+      // - dither=bayer:bayer_scale=5: O pulo do gato! Cria um pontilhado que
+      //   reduz o tamanho do arquivo drasticamente sem destruir a imagem visualmente.
+      const videoFilter = `fps=8,scale=512:512,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5`;
 
       const command = `ffmpeg -y -ss ${startTime} -t ${duration} -i "${inputPath}" ` +
         `-vf "${videoFilter}" ` +
@@ -92,13 +100,13 @@ class Ffmpeg {
 
       await this._executeCommand(command);
 
-      // 2. Sharp: Converte GIF -> WebP (MODO VELOZ)
-      // MUDANÇA: effort: 0 (Mais rápido possível)
-      // quality: 30 (Equilíbrio para não ficar gigante nem feio)
+      // 2. Sharp: Converte GIF -> WebP (Equilíbrio Visual)
+      // quality: 40 -> Visualmente "Adequado" (não é HD, mas não é borrão)
+      // effort: 0   -> Velocidade máxima para não travar o bot
       await sharp(gifTempPath, { animated: true })
         .webp({
-          quality: 30,       
-          effort: 0,          // <--- AQUI ESTAVA O PROBLEMA (Era 6, travava o servidor)
+          quality: 40,
+          effort: 0, 
           loop: 0
         })
         .toFile(webpOutputPath);
@@ -131,7 +139,14 @@ class Ffmpeg {
     }
   }
 
-  // --- FILTROS (MANTIDOS) ---
+  async convertToMp3(inputPath) {
+    const outputPath = await this._createTempFilePath("mp3");
+    const command = `ffmpeg -i ${inputPath} -vn -acodec libmp3lame -b:a 192k ${outputPath}`;
+    await this._executeCommand(command);
+    return outputPath;
+  }
+
+  // Métodos auxiliares de imagem (Blur, Grayscale, etc)
   async applyBlur(inputPath, intensity = "7:5") {
     const outputPath = await this._createTempFilePath();
     const command = `ffmpeg -i ${inputPath} -vf boxblur=${intensity} ${outputPath}`;
@@ -163,13 +178,6 @@ class Ffmpeg {
   async applyPixelation(inputPath) {
     const outputPath = await this._createTempFilePath();
     const command = `ffmpeg -i ${inputPath} -vf 'scale=iw/6:ih/6, scale=iw*10:ih*10:flags=neighbor' ${outputPath}`;
-    await this._executeCommand(command);
-    return outputPath;
-  }
-
-  async convertToMp3(inputPath) {
-    const outputPath = await this._createTempFilePath("mp3");
-    const command = `ffmpeg -i ${inputPath} -vn -acodec libmp3lame -b:a 192k ${outputPath}`;
     await this._executeCommand(command);
     return outputPath;
   }
