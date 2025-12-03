@@ -1,17 +1,14 @@
 /**
  * Serviços de processamento de imagens e áudio.
- * VERSÃO COMPLETA E ESTÁVEL (FFMPEG + SHARP)
- * * Correções incluídas:
- * 1. /fig10: Usa corte via GIF para resetar timestamps e evitar figurinhas cinzas.
- * 2. /togif: Usa Sharp para ler WebP e FFmpeg para gerar MP4 compatível.
- * 3. Dependências: Requer 'sharp' instalado (npm install sharp).
- *
- * @author MRX / Refatorado por Gemini
+ * VERSÃO OTIMIZADA (Tudo via Sharp para imagens/WebP)
+ * * Correções:
+ * 1. Fotos agora são processadas pelo Sharp (mais rápido e sem erros do FFmpeg).
+ * 2. Vídeos continuam usando a estratégia híbrida (FFmpeg -> GIF -> Sharp).
  */
 import { exec } from "child_process";
 import fs from "node:fs";
 import path from "node:path";
-import sharp from "sharp"; // Essencial para manipulação robusta de imagens/GIFs
+import sharp from "sharp"; 
 import { TEMP_DIR } from "../config.js";
 import { getRandomNumber } from "../utils/index.js";
 import { errorLog } from "../utils/logger.js";
@@ -21,13 +18,9 @@ class Ffmpeg {
     this.tempDir = TEMP_DIR;
   }
 
-  /**
-   * Executa comandos no terminal
-   */
   async _executeCommand(command) {
     return new Promise((resolve, reject) => {
       exec(command, (error, stdout, stderr) => {
-        // Ignora erros não fatais, rejeita apenas se o código de saída for erro
         if (error && error.code !== 0) {
           errorLog(`FFmpeg Error: ${stderr}`);
           return reject(new Error(`FFmpeg failed: ${stderr}`));
@@ -49,41 +42,51 @@ class Ffmpeg {
   // ===========================================================================
 
   /**
-   * Cria Sticker (WebP) Simples.
-   * Usado para imagens ou vídeos curtos que não precisam de corte específico.
+   * Cria Sticker (WebP).
+   * - Se for Vídeo: Usa estratégia FFmpeg->GIF->Sharp.
+   * - Se for Imagem: Usa Sharp direto (Correção para o erro que você relatou).
    */
   async createSticker(inputPath, isVideo = false) {
-    // Se for vídeo, usamos a lógica do cutVideoToWebP (do 0 ao 10s) para garantir qualidade
+    // 1. Lógica para VÍDEOS (Animados)
     if (isVideo) {
       return this.cutVideoToWebP(inputPath, 0, 10);
     }
 
-    // Para imagens estáticas, FFmpeg direto é mais rápido
+    // 2. Lógica para IMAGENS (Estáticas) - AGORA USANDO SHARP
     const outputPath = await this._createTempFilePath("webp");
-    const command = `ffmpeg -i "${inputPath}" ` +
+    
+    try {
+      await sharp(inputPath)
+        .resize(512, 512, {
+          fit: 'contain', // Mantém a proporção (não estica)
+          background: { r: 0, g: 0, b: 0, alpha: 0 } // Fundo transparente nas bordas
+        })
+        .webp({ quality: 80 }) // Qualidade boa e arquivo leve
+        .toFile(outputPath);
+        
+      return outputPath;
+
+    } catch (error) {
+      console.error("Erro ao criar sticker de imagem com Sharp:", error);
+      // Fallback: Se o Sharp falhar (raro), tenta o FFmpeg antigo
+      const command = `ffmpeg -i "${inputPath}" ` +
         `-vf "scale=512:512:force_original_aspect_ratio=decrease" ` +
         `-f webp -quality 90 ` +
         `"${outputPath}"`;
-    
-    await this._executeCommand(command);
-    return outputPath;
+      await this._executeCommand(command);
+      return outputPath;
+    }
   }
 
   /**
-   * MÁGICA DO FIG10: Corta vídeo e converte para WebP.
-   * * Estratégia "Híbrida":
-   * 1. FFmpeg corta e gera um GIF. (GIF obrigatoriamente reseta o tempo para 0s).
-   * 2. Sharp converte o GIF para WebP. (Garante headers corretos e sem corrupção).
+   * MÁGICA DO FIG10 E VÍDEOS: Corta vídeo e converte para WebP.
    */
   async cutVideoToWebP(inputPath, startTime, duration) {
     const gifTempPath = await this._createTempFilePath("gif");
     const webpOutputPath = await this._createTempFilePath("webp");
 
     try {
-      // 1. FFmpeg: Corta -> Redimensiona -> GIF
-      // -ss antes do -i: Fast seek (rápido)
-      // fps=8: Mantém leve
-      // split+palettegen: Garante cores melhores no GIF intermediário
+      // FFmpeg gera GIF (reseta timestamps)
       const command = `ffmpeg -y -ss ${startTime} -t ${duration} -i "${inputPath}" ` +
         `-vf "fps=8,scale=512:512:force_original_aspect_ratio=decrease,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" ` +
         `-f gif ` +
@@ -91,13 +94,12 @@ class Ffmpeg {
 
       await this._executeCommand(command);
 
-      // 2. Sharp: GIF -> WebP Animado
-      // O Sharp é muito mais estável para gerar o WebP final que o FFmpeg antigo
+      // Sharp converte GIF -> WebP
       await sharp(gifTempPath, { animated: true })
         .webp({
-          quality: 50,    // Qualidade média para arquivo pequeno
-          effort: 3,      // Esforço baixo para ser rápido
-          loop: 0         // Loop infinito
+          quality: 50,
+          effort: 3,
+          loop: 0
         })
         .toFile(webpOutputPath);
 
@@ -107,32 +109,21 @@ class Ffmpeg {
       console.error("Erro no processo Cut -> GIF -> WebP:", error);
       throw error;
     } finally {
-      // Limpa o GIF temporário
       if (fs.existsSync(gifTempPath)) fs.unlinkSync(gifTempPath);
     }
   }
 
   // ===========================================================================
-  // CONVERSÃO PARA GIF/VIDEO (/togif)
+  // OUTROS MÉTODOS
   // ===========================================================================
 
-  /**
-   * Converte Sticker Animado (WebP) para MP4.
-   * Resolve o erro "unsupported chunk: ANIM" usando Sharp para ler o WebP.
-   */
   async convertStickerToGif(inputPath) {
     const gifTempPath = await this._createTempFilePath("gif");
     const mp4OutputPath = await this._createTempFilePath("mp4");
 
     try {
-      // 1. Sharp: Lê o WebP animado (que o FFmpeg falha) e salva como GIF
-      await sharp(inputPath, { animated: true })
-        .toFormat("gif")
-        .toFile(gifTempPath);
-
-      // 2. FFmpeg: Converte GIF para MP4 (H.264)
-      // -pix_fmt yuv420p: Obrigatório para o WhatsApp
-      // -vf scale: Garante dimensões pares (obrigatório para MP4)
+      await sharp(inputPath, { animated: true }).toFormat("gif").toFile(gifTempPath);
+      
       const command = `ffmpeg -y -i "${gifTempPath}" ` +
         `-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" ` +
         `-c:v libx264 -preset fast -crf 26 ` +
@@ -142,19 +133,12 @@ class Ffmpeg {
 
       await this._executeCommand(command);
       return mp4OutputPath;
-
-    } catch (error) {
-      console.error("Erro na conversão Sharp -> FFmpeg:", error);
-      throw error;
     } finally {
       if (fs.existsSync(gifTempPath)) fs.unlinkSync(gifTempPath);
     }
   }
 
-  // ===========================================================================
-  // FILTROS DE IMAGEM E ÁUDIO (EXTRAS)
-  // ===========================================================================
-
+  // --- FILTROS (Mantidos) ---
   async applyBlur(inputPath, intensity = "7:5") {
     const outputPath = await this._createTempFilePath();
     const command = `ffmpeg -i ${inputPath} -vf boxblur=${intensity} ${outputPath}`;
@@ -192,22 +176,14 @@ class Ffmpeg {
 
   async convertToMp3(inputPath) {
     const outputPath = await this._createTempFilePath("mp3");
-    // Usa libmp3lame para garantir formato MP3 real
     const command = `ffmpeg -i ${inputPath} -vn -acodec libmp3lame -b:a 192k ${outputPath}`;
     await this._executeCommand(command);
     return outputPath;
   }
 
-  /**
-   * Limpa arquivos temporários
-   */
   async cleanup(filePath) {
     if (filePath && fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-      } catch (err) {
-        console.error(`Erro ao deletar arquivo ${filePath}:`, err);
-      }
+      try { fs.unlinkSync(filePath); } catch (err) { console.error(err); }
     }
   }
 }
