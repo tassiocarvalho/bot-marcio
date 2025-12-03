@@ -72,9 +72,9 @@ async function downloadMp3(videoUrl, outputPath) {
 // ============================================
 
 export default {
-  name: "play",
+  name: "playoff",
   description: "Baixa música do YouTube como MP3.",
-  commands: ["play"],
+  commands: ["playoff"],
   usage: `${PREFIX}play <nome da música>`,
 
   handle: async ({ args, sendReply, sendWaitReact, sendSuccessReact, sendErrorReply, sendAudioFromFile }) => {
