@@ -1,10 +1,10 @@
 /**
  * Serviços de processamento de imagens e áudio.
- * VERSÃO "SAFE MODE" (1:1 ESTICADO + COMPRESSÃO AGRESSIVA)
- * * Otimizações:
- * - Imagens: fit 'fill' (estica) + Qualidade 60.
- * - Vídeos: scale 512:512 (estica) + Qualidade 12 + Esforço Máximo.
- * - Objetivo: Evitar a todo custo passar de 1MB.
+ * VERSÃO VELOCIDADE (SPEED MODE)
+ * * Correção:
+ * - Reduzido o 'effort' do Sharp de 6 (muito lento) para 0 (muito rápido).
+ * - Isso resolve o problema do bot "ficar preso" ao gerar figurinhas animadas.
+ * - Mantém o formato 1:1 esticado.
  */
 import { exec } from "child_process";
 import fs from "node:fs";
@@ -46,51 +46,43 @@ class Ffmpeg {
    * Cria Sticker (WebP).
    */
   async createSticker(inputPath, isVideo = false) {
-    // 1. VÍDEOS (Animados) -> cutVideoToWebP
+    // 1. VÍDEOS (Animados)
     if (isVideo) {
+      console.log("Processando vídeo animado..."); // Log para debug
       return this.cutVideoToWebP(inputPath, 0, 10);
     }
 
-    // 2. IMAGENS (Estáticas) -> Sharp Direto
+    // 2. IMAGENS (Estáticas)
     const outputPath = await this._createTempFilePath("webp");
     
     try {
       await sharp(inputPath)
-        .resize(512, 512, {
-          fit: 'fill' // 'fill' = Estica para preencher o quadrado (sem cortes)
-        })
-        .webp({ 
-          quality: 60, // 60 é seguro para fotos estáticas ficarem leves
-          effort: 5 
-        }) 
+        .resize(512, 512, { fit: 'fill' }) // Estica
+        .webp({ quality: 60, effort: 0 }) // Rápido
         .toFile(outputPath);
         
       return outputPath;
 
     } catch (error) {
       console.error("Erro Sharp (Imagem):", error);
-      // Fallback FFmpeg
-      const command = `ffmpeg -i "${inputPath}" ` +
-        `-vf "scale=512:512" ` + 
-        `-f webp -quality 60 ` +
-        `"${outputPath}"`;
+      // Fallback
+      const command = `ffmpeg -i "${inputPath}" -vf "scale=512:512" -f webp -quality 60 "${outputPath}"`;
       await this._executeCommand(command);
       return outputPath;
     }
   }
 
   /**
-   * MÁGICA DOS VÍDEOS (ANIMADOS)
-   * Processo: Cut -> GIF -> WebP (Ultra Comprimido)
+   * MÁGICA DOS VÍDEOS (ANIMADOS) - OTIMIZADO PARA VELOCIDADE
    */
   async cutVideoToWebP(inputPath, startTime, duration) {
     const gifTempPath = await this._createTempFilePath("gif");
     const webpOutputPath = await this._createTempFilePath("webp");
 
     try {
-      // 1. FFmpeg: Gera GIF (Esticado 512x512)
-      // fps=8: Manteve-se baixo para economizar espaço
-      // scale=512:512: Força o tamanho exato (estica se precisar)
+      // 1. FFmpeg: Gera GIF (Rápido)
+      // fps=8: Mantém leve
+      // scale=512:512: Estica
       const videoFilter = `fps=8,scale=512:512,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
 
       const command = `ffmpeg -y -ss ${startTime} -t ${duration} -i "${inputPath}" ` +
@@ -100,13 +92,13 @@ class Ffmpeg {
 
       await this._executeCommand(command);
 
-      // 2. Sharp: Converte GIF -> WebP (Compressão Extrema)
-      // Aqui está o segredo para não passar de 1MB:
+      // 2. Sharp: Converte GIF -> WebP (MODO VELOZ)
+      // MUDANÇA: effort: 0 (Mais rápido possível)
+      // quality: 30 (Equilíbrio para não ficar gigante nem feio)
       await sharp(gifTempPath, { animated: true })
         .webp({
-          quality: 12,        // Qualidade baixa visualmente aceitável para stickers, mas arquivo pequeno
-          effort: 6,          // Esforço máximo (demora + uns milissegundos, mas compacta muito melhor)
-          smartSubsample: true, // Ajuda na clareza mesmo com qualidade baixa
+          quality: 30,       
+          effort: 0,          // <--- AQUI ESTAVA O PROBLEMA (Era 6, travava o servidor)
           loop: 0
         })
         .toFile(webpOutputPath);
@@ -131,14 +123,7 @@ class Ffmpeg {
 
     try {
       await sharp(inputPath, { animated: true }).toFormat("gif").toFile(gifTempPath);
-      
-      const command = `ffmpeg -y -i "${gifTempPath}" ` +
-        `-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" ` +
-        `-c:v libx264 -preset fast -crf 26 ` +
-        `-pix_fmt yuv420p ` +
-        `-movflags faststart ` +
-        `"${mp4OutputPath}"`;
-
+      const command = `ffmpeg -y -i "${gifTempPath}" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset fast -crf 26 -pix_fmt yuv420p -movflags faststart "${mp4OutputPath}"`;
       await this._executeCommand(command);
       return mp4OutputPath;
     } finally {
