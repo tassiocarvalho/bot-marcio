@@ -105,7 +105,7 @@ class Ffmpeg {
       // effort: 0   -> Velocidade máxima para não travar o bot
       await sharp(gifTempPath, { animated: true })
         .webp({
-          quality: 40,
+          quality: 20,
           effort: 0, 
           loop: 0
         })
