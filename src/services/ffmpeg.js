@@ -1,9 +1,9 @@
 /**
  * Serviços de processamento de imagens e áudio.
- * VERSÃO OTIMIZADA (Tudo via Sharp para imagens/WebP)
- * * Correções:
- * 1. Fotos agora são processadas pelo Sharp (mais rápido e sem erros do FFmpeg).
- * 2. Vídeos continuam usando a estratégia híbrida (FFmpeg -> GIF -> Sharp).
+ * VERSÃO OTIMIZADA (SHARP + FFMPEG)
+ * * Atualização:
+ * - Figurinhas de imagem (FOTOS) agora são cortadas em 1:1 (fit: cover).
+ * A imagem vai preencher todo o quadrado, cortando excessos laterais.
  */
 import { exec } from "child_process";
 import fs from "node:fs";
@@ -43,8 +43,8 @@ class Ffmpeg {
 
   /**
    * Cria Sticker (WebP).
-   * - Se for Vídeo: Usa estratégia FFmpeg->GIF->Sharp.
-   * - Se for Imagem: Usa Sharp direto (Correção para o erro que você relatou).
+   * - Vídeo: Estratégia Híbrida (Cut -> GIF -> Sharp).
+   * - Foto: Sharp com crop 1:1 (Preenche todo o quadrado).
    */
   async createSticker(inputPath, isVideo = false) {
     // 1. Lógica para VÍDEOS (Animados)
@@ -52,25 +52,28 @@ class Ffmpeg {
       return this.cutVideoToWebP(inputPath, 0, 10);
     }
 
-    // 2. Lógica para IMAGENS (Estáticas) - AGORA USANDO SHARP
+    // 2. Lógica para IMAGENS (Estáticas)
     const outputPath = await this._createTempFilePath("webp");
     
     try {
       await sharp(inputPath)
         .resize(512, 512, {
-          fit: 'contain', // Mantém a proporção (não estica)
-          background: { r: 0, g: 0, b: 0, alpha: 0 } // Fundo transparente nas bordas
+          // 'cover': Corta o que sobrar (zoom central) para preencher o quadrado.
+          // 'fill': Estica a imagem (deforma) para preencher.
+          // 'contain': Mantém a proporção original com bordas transparentes (o que estava antes).
+          fit: 'cover' 
         })
-        .webp({ quality: 80 }) // Qualidade boa e arquivo leve
+        .webp({ quality: 80 }) 
         .toFile(outputPath);
         
       return outputPath;
 
     } catch (error) {
-      console.error("Erro ao criar sticker de imagem com Sharp:", error);
-      // Fallback: Se o Sharp falhar (raro), tenta o FFmpeg antigo
+      console.error("Erro Sharp (Imagem):", error);
+      // Fallback FFmpeg (caso raro de erro no Sharp)
+      // scale=512:512 força o tamanho.
       const command = `ffmpeg -i "${inputPath}" ` +
-        `-vf "scale=512:512:force_original_aspect_ratio=decrease" ` +
+        `-vf "scale=512:512" ` + // Força 512x512 (pode esticar dependendo da versão, mas preenche)
         `-f webp -quality 90 ` +
         `"${outputPath}"`;
       await this._executeCommand(command);
@@ -79,14 +82,14 @@ class Ffmpeg {
   }
 
   /**
-   * MÁGICA DO FIG10 E VÍDEOS: Corta vídeo e converte para WebP.
+   * MÁGICA DO FIG10 E VÍDEOS
    */
   async cutVideoToWebP(inputPath, startTime, duration) {
     const gifTempPath = await this._createTempFilePath("gif");
     const webpOutputPath = await this._createTempFilePath("webp");
 
     try {
-      // FFmpeg gera GIF (reseta timestamps)
+      // FFmpeg: Gera GIF (limpa timestamps)
       const command = `ffmpeg -y -ss ${startTime} -t ${duration} -i "${inputPath}" ` +
         `-vf "fps=8,scale=512:512:force_original_aspect_ratio=decrease,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" ` +
         `-f gif ` +
@@ -94,7 +97,7 @@ class Ffmpeg {
 
       await this._executeCommand(command);
 
-      // Sharp converte GIF -> WebP
+      // Sharp: GIF -> WebP
       await sharp(gifTempPath, { animated: true })
         .webp({
           quality: 50,
@@ -106,7 +109,7 @@ class Ffmpeg {
       return webpOutputPath;
 
     } catch (error) {
-      console.error("Erro no processo Cut -> GIF -> WebP:", error);
+      console.error("Erro Cut -> GIF -> WebP:", error);
       throw error;
     } finally {
       if (fs.existsSync(gifTempPath)) fs.unlinkSync(gifTempPath);
@@ -138,7 +141,7 @@ class Ffmpeg {
     }
   }
 
-  // --- FILTROS (Mantidos) ---
+  // --- FILTROS ---
   async applyBlur(inputPath, intensity = "7:5") {
     const outputPath = await this._createTempFilePath();
     const command = `ffmpeg -i ${inputPath} -vf boxblur=${intensity} ${outputPath}`;
