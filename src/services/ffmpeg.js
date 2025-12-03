@@ -1,10 +1,9 @@
 /**
  * Serviços de processamento de imagens e áudio.
- * VERSÃO OTIMIZADA (1:1 REAIS PARA VÍDEO E FOTO)
+ * VERSÃO "FILL" (ESTICA PARA 512x512)
  * * Atualização:
- * - Vídeos agora usam 'crop=512:512' no FFmpeg. 
- * Isso resolve o bug de vídeos verticais (celular) ficarem finos ou com bordas.
- * Agora o vídeo preenche todo o quadrado (Zoom Central).
+ * - Fotos e Vídeos agora são forçados a ter 512x512.
+ * - Isso "espreme" a imagem para caber no quadrado sem cortar nada.
  */
 import { exec } from "child_process";
 import fs from "node:fs";
@@ -44,13 +43,12 @@ class Ffmpeg {
 
   /**
    * Cria Sticker (WebP).
-   * - Vídeo: Corta 1:1 e converte.
-   * - Foto: Corta 1:1 e converte.
+   * - Vídeo: Estica para 512x512.
+   * - Foto: Estica para 512x512.
    */
   async createSticker(inputPath, isVideo = false) {
     // 1. Lógica para VÍDEOS (Animados)
     if (isVideo) {
-      // Chama o método que trata o corte de vídeo corretamente
       return this.cutVideoToWebP(inputPath, 0, 10);
     }
 
@@ -58,11 +56,11 @@ class Ffmpeg {
     const outputPath = await this._createTempFilePath("webp");
     
     try {
-      // Sharp faz o recorte inteligente (Center Crop)
       await sharp(inputPath)
         .resize(512, 512, {
-          fit: 'cover', // Preenche tudo (Zoom)
-          position: 'center' // Foca no centro
+          // 'fill': Ignora a proporção original e estica a imagem 
+          // para preencher EXATAMENTE 512x512.
+          fit: 'fill' 
         })
         .webp({ quality: 80 }) 
         .toFile(outputPath);
@@ -71,7 +69,7 @@ class Ffmpeg {
 
     } catch (error) {
       console.error("Erro Sharp (Imagem):", error);
-      // Fallback FFmpeg simples
+      // Fallback FFmpeg forçado
       const command = `ffmpeg -i "${inputPath}" ` +
         `-vf "scale=512:512" ` + 
         `-f webp -quality 90 ` +
@@ -82,17 +80,17 @@ class Ffmpeg {
   }
 
   /**
-   * MÁGICA DO FIG10 E VÍDEOS (CORRIGIDO PARA 1:1 SEM BORDAS)
+   * MÁGICA DO FIG10 E VÍDEOS (CORRIGIDO PARA ESTICAR/FILL)
    */
   async cutVideoToWebP(inputPath, startTime, duration) {
     const gifTempPath = await this._createTempFilePath("gif");
     const webpOutputPath = await this._createTempFilePath("webp");
 
     try {
-      // MUDANÇA IMPORTANTE NO FILTRO:
-      // 1. scale=...:increase -> Aumenta o vídeo até cobrir o quadrado (sem distorcer)
-      // 2. crop=512:512 -> Corta exatamente o centro, jogando fora as bordas extras
-      const videoFilter = `fps=8,scale=512:512:force_original_aspect_ratio=increase,crop=512:512,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
+      // MUDANÇA NO FILTRO DE VÍDEO:
+      // Removemos 'force_original_aspect_ratio' e 'crop'.
+      // Usamos apenas scale=512:512. Isso obriga o vídeo a ficar quadrado, esticando se necessário.
+      const videoFilter = `fps=8,scale=512:512,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
 
       const command = `ffmpeg -y -ss ${startTime} -t ${duration} -i "${inputPath}" ` +
         `-vf "${videoFilter}" ` +
