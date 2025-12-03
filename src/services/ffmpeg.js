@@ -1,9 +1,10 @@
 /**
  * Serviços de processamento de imagens e áudio.
- * VERSÃO OTIMIZADA (SHARP + FFMPEG)
+ * VERSÃO OTIMIZADA (1:1 REAIS PARA VÍDEO E FOTO)
  * * Atualização:
- * - Figurinhas de imagem (FOTOS) agora são cortadas em 1:1 (fit: cover).
- * A imagem vai preencher todo o quadrado, cortando excessos laterais.
+ * - Vídeos agora usam 'crop=512:512' no FFmpeg. 
+ * Isso resolve o bug de vídeos verticais (celular) ficarem finos ou com bordas.
+ * Agora o vídeo preenche todo o quadrado (Zoom Central).
  */
 import { exec } from "child_process";
 import fs from "node:fs";
@@ -43,12 +44,13 @@ class Ffmpeg {
 
   /**
    * Cria Sticker (WebP).
-   * - Vídeo: Estratégia Híbrida (Cut -> GIF -> Sharp).
-   * - Foto: Sharp com crop 1:1 (Preenche todo o quadrado).
+   * - Vídeo: Corta 1:1 e converte.
+   * - Foto: Corta 1:1 e converte.
    */
   async createSticker(inputPath, isVideo = false) {
     // 1. Lógica para VÍDEOS (Animados)
     if (isVideo) {
+      // Chama o método que trata o corte de vídeo corretamente
       return this.cutVideoToWebP(inputPath, 0, 10);
     }
 
@@ -56,12 +58,11 @@ class Ffmpeg {
     const outputPath = await this._createTempFilePath("webp");
     
     try {
+      // Sharp faz o recorte inteligente (Center Crop)
       await sharp(inputPath)
         .resize(512, 512, {
-          // 'cover': Corta o que sobrar (zoom central) para preencher o quadrado.
-          // 'fill': Estica a imagem (deforma) para preencher.
-          // 'contain': Mantém a proporção original com bordas transparentes (o que estava antes).
-          fit: 'cover' 
+          fit: 'cover', // Preenche tudo (Zoom)
+          position: 'center' // Foca no centro
         })
         .webp({ quality: 80 }) 
         .toFile(outputPath);
@@ -70,10 +71,9 @@ class Ffmpeg {
 
     } catch (error) {
       console.error("Erro Sharp (Imagem):", error);
-      // Fallback FFmpeg (caso raro de erro no Sharp)
-      // scale=512:512 força o tamanho.
+      // Fallback FFmpeg simples
       const command = `ffmpeg -i "${inputPath}" ` +
-        `-vf "scale=512:512" ` + // Força 512x512 (pode esticar dependendo da versão, mas preenche)
+        `-vf "scale=512:512" ` + 
         `-f webp -quality 90 ` +
         `"${outputPath}"`;
       await this._executeCommand(command);
@@ -82,16 +82,20 @@ class Ffmpeg {
   }
 
   /**
-   * MÁGICA DO FIG10 E VÍDEOS
+   * MÁGICA DO FIG10 E VÍDEOS (CORRIGIDO PARA 1:1 SEM BORDAS)
    */
   async cutVideoToWebP(inputPath, startTime, duration) {
     const gifTempPath = await this._createTempFilePath("gif");
     const webpOutputPath = await this._createTempFilePath("webp");
 
     try {
-      // FFmpeg: Gera GIF (limpa timestamps)
+      // MUDANÇA IMPORTANTE NO FILTRO:
+      // 1. scale=...:increase -> Aumenta o vídeo até cobrir o quadrado (sem distorcer)
+      // 2. crop=512:512 -> Corta exatamente o centro, jogando fora as bordas extras
+      const videoFilter = `fps=8,scale=512:512:force_original_aspect_ratio=increase,crop=512:512,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
+
       const command = `ffmpeg -y -ss ${startTime} -t ${duration} -i "${inputPath}" ` +
-        `-vf "fps=8,scale=512:512:force_original_aspect_ratio=decrease,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" ` +
+        `-vf "${videoFilter}" ` +
         `-f gif ` +
         `"${gifTempPath}"`;
 
