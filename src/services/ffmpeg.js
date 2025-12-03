@@ -1,9 +1,10 @@
 /**
  * Serviços de processamento de imagens e áudio.
- * VERSÃO "FILL" (ESTICA PARA 512x512)
- * * Atualização:
- * - Fotos e Vídeos agora são forçados a ter 512x512.
- * - Isso "espreme" a imagem para caber no quadrado sem cortar nada.
+ * VERSÃO "SAFE MODE" (1:1 ESTICADO + COMPRESSÃO AGRESSIVA)
+ * * Otimizações:
+ * - Imagens: fit 'fill' (estica) + Qualidade 60.
+ * - Vídeos: scale 512:512 (estica) + Qualidade 12 + Esforço Máximo.
+ * - Objetivo: Evitar a todo custo passar de 1MB.
  */
 import { exec } from "child_process";
 import fs from "node:fs";
@@ -43,36 +44,35 @@ class Ffmpeg {
 
   /**
    * Cria Sticker (WebP).
-   * - Vídeo: Estica para 512x512.
-   * - Foto: Estica para 512x512.
    */
   async createSticker(inputPath, isVideo = false) {
-    // 1. Lógica para VÍDEOS (Animados)
+    // 1. VÍDEOS (Animados) -> cutVideoToWebP
     if (isVideo) {
       return this.cutVideoToWebP(inputPath, 0, 10);
     }
 
-    // 2. Lógica para IMAGENS (Estáticas)
+    // 2. IMAGENS (Estáticas) -> Sharp Direto
     const outputPath = await this._createTempFilePath("webp");
     
     try {
       await sharp(inputPath)
         .resize(512, 512, {
-          // 'fill': Ignora a proporção original e estica a imagem 
-          // para preencher EXATAMENTE 512x512.
-          fit: 'fill' 
+          fit: 'fill' // 'fill' = Estica para preencher o quadrado (sem cortes)
         })
-        .webp({ quality: 80 }) 
+        .webp({ 
+          quality: 60, // 60 é seguro para fotos estáticas ficarem leves
+          effort: 5 
+        }) 
         .toFile(outputPath);
         
       return outputPath;
 
     } catch (error) {
       console.error("Erro Sharp (Imagem):", error);
-      // Fallback FFmpeg forçado
+      // Fallback FFmpeg
       const command = `ffmpeg -i "${inputPath}" ` +
         `-vf "scale=512:512" ` + 
-        `-f webp -quality 90 ` +
+        `-f webp -quality 60 ` +
         `"${outputPath}"`;
       await this._executeCommand(command);
       return outputPath;
@@ -80,16 +80,17 @@ class Ffmpeg {
   }
 
   /**
-   * MÁGICA DO FIG10 E VÍDEOS (CORRIGIDO PARA ESTICAR/FILL)
+   * MÁGICA DOS VÍDEOS (ANIMADOS)
+   * Processo: Cut -> GIF -> WebP (Ultra Comprimido)
    */
   async cutVideoToWebP(inputPath, startTime, duration) {
     const gifTempPath = await this._createTempFilePath("gif");
     const webpOutputPath = await this._createTempFilePath("webp");
 
     try {
-      // MUDANÇA NO FILTRO DE VÍDEO:
-      // Removemos 'force_original_aspect_ratio' e 'crop'.
-      // Usamos apenas scale=512:512. Isso obriga o vídeo a ficar quadrado, esticando se necessário.
+      // 1. FFmpeg: Gera GIF (Esticado 512x512)
+      // fps=8: Manteve-se baixo para economizar espaço
+      // scale=512:512: Força o tamanho exato (estica se precisar)
       const videoFilter = `fps=8,scale=512:512,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`;
 
       const command = `ffmpeg -y -ss ${startTime} -t ${duration} -i "${inputPath}" ` +
@@ -99,11 +100,13 @@ class Ffmpeg {
 
       await this._executeCommand(command);
 
-      // Sharp: GIF -> WebP
+      // 2. Sharp: Converte GIF -> WebP (Compressão Extrema)
+      // Aqui está o segredo para não passar de 1MB:
       await sharp(gifTempPath, { animated: true })
         .webp({
-          quality: 50,
-          effort: 3,
+          quality: 12,        // Qualidade baixa visualmente aceitável para stickers, mas arquivo pequeno
+          effort: 6,          // Esforço máximo (demora + uns milissegundos, mas compacta muito melhor)
+          smartSubsample: true, // Ajuda na clareza mesmo com qualidade baixa
           loop: 0
         })
         .toFile(webpOutputPath);
@@ -143,7 +146,7 @@ class Ffmpeg {
     }
   }
 
-  // --- FILTROS ---
+  // --- FILTROS (MANTIDOS) ---
   async applyBlur(inputPath, intensity = "7:5") {
     const outputPath = await this._createTempFilePath();
     const command = `ffmpeg -i ${inputPath} -vf boxblur=${intensity} ${outputPath}`;
