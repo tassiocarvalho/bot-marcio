@@ -111,7 +111,7 @@ class Ffmpeg {
       if (isHeavyVideo) {
         // --- MODO PESADO (Para vídeos Full HD/4K) ---
         console.log(`Vídeo Pesado (${originalWidth}px). Aplicando compressão agressiva.`);
-        fps = 6;              // FPS baixo para economizar
+        fps = 3;              // FPS baixo para economizar
         ditherScale = 1;      // Dither forte (pontilhado) para reduzir cores
         webpQuality = 5;     // Qualidade baixa
       } else {
