@@ -1,10 +1,11 @@
 /**
  * Serviços de processamento de imagens e áudio.
- * VERSÃO FINAL: "VISUALLY ADEQUATE" (Equilíbrio Visual x Performance)
- * * Ajustes realizados:
- * 1. Compressão Inteligente: Usa dither Bayer no FFmpeg para gerar GIFs leves.
- * 2. Formato: 1:1 Esticado (Fill) para preencher a figurinha inteira.
- * 3. Qualidade: Ajustada para 40 (Sharp) com Effort 0 (Rápido).
+ * VERSÃO INTELIGENTE (AUTO-DETECT HD)
+ * * Novidade:
+ * - O bot agora detecta se o vídeo é "Pesado" (HD/Full HD/4K).
+ * - Se for pesado (> 860px), ele aplica redução agressiva (FPS 6, Qualidade 20).
+ * - Se for leve, ele mantém a qualidade visual boa (FPS 9, Qualidade 40).
+ * - Mantém o formato 1:1 Esticado (Fill).
  */
 import { exec } from "child_process";
 import fs from "node:fs";
@@ -23,9 +24,8 @@ class Ffmpeg {
     return new Promise((resolve, reject) => {
       exec(command, (error, stdout, stderr) => {
         if (error && error.code !== 0) {
-          // Ignora warnings, foca em erros reais
           if (!stderr.includes("Conversion failed")) {
-             // console.warn(stderr); // Descomente para debug
+             // console.warn(stderr); 
           } else {
              errorLog(`FFmpeg Error: ${stderr}`);
              return reject(new Error(`FFmpeg failed: ${stderr}`));
@@ -44,33 +44,48 @@ class Ffmpeg {
   }
 
   // ===========================================================================
+  // NOVO: DETECTOR DE RESOLUÇÃO
+  // ===========================================================================
+  
+  /**
+   * Pega a largura do vídeo para decidir qual qualidade usar.
+   */
+  async _getVideoWidth(inputPath) {
+    return new Promise((resolve) => {
+      // ffprobe vem junto com o ffmpeg, serve para ler metadados
+      const cmd = `ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=s=x:p=0 "${inputPath}"`;
+      
+      exec(cmd, (error, stdout) => {
+        if (error || !stdout) {
+          console.warn("Não foi possível ler resolução. Usando modo padrão.");
+          resolve(0); // Se falhar, assume 0 (modo padrão)
+        } else {
+          const width = parseInt(stdout.trim());
+          resolve(isNaN(width) ? 0 : width);
+        }
+      });
+    });
+  }
+
+  // ===========================================================================
   // MÉTODOS DE STICKER (CORE)
   // ===========================================================================
 
-  /**
-   * Cria Sticker (WebP).
-   */
   async createSticker(inputPath, isVideo = false) {
-    // 1. VÍDEOS (Animados)
     if (isVideo) {
-      // Chama o método especialista em compressão de vídeo
       return this.cutVideoToWebP(inputPath, 0, 10);
     }
 
-    // 2. IMAGENS (Estáticas)
+    // IMAGENS (Estáticas)
     const outputPath = await this._createTempFilePath("webp");
-    
     try {
       await sharp(inputPath)
-        .resize(512, 512, { fit: 'fill' }) // Estica para preencher
-        .webp({ quality: 70, effort: 0 })  // Qualidade boa para fotos
+        .resize(512, 512, { fit: 'fill' }) 
+        .webp({ quality: 70, effort: 0 }) 
         .toFile(outputPath);
-        
       return outputPath;
-
     } catch (error) {
       console.error("Erro Sharp (Imagem):", error);
-      // Fallback FFmpeg
       const command = `ffmpeg -i "${inputPath}" -vf "scale=512:512" -f webp -quality 70 "${outputPath}"`;
       await this._executeCommand(command);
       return outputPath;
@@ -78,20 +93,37 @@ class Ffmpeg {
   }
 
   /**
-   * MÁGICA DOS VÍDEOS (ANIMADOS)
-   * Reduz qualidade do vídeo para um nível adequado e gera figurinha.
+   * MÁGICA DOS VÍDEOS (COM INTELIGÊNCIA)
+   * Verifica se o vídeo é HD. Se for, esmaga a qualidade. Se não, deixa bonito.
    */
   async cutVideoToWebP(inputPath, startTime, duration) {
     const gifTempPath = await this._createTempFilePath("gif");
     const webpOutputPath = await this._createTempFilePath("webp");
 
     try {
-      // 1. FFmpeg: Gera GIF OTIMIZADO
-      // - fps=8: Fluidez aceitável para stickers
-      // - scale=512:512: Formato quadrado esticado
-      // - dither=bayer:bayer_scale=5: O pulo do gato! Cria um pontilhado que
-      //   reduz o tamanho do arquivo drasticamente sem destruir a imagem visualmente.
-      const videoFilter = `fps=8,scale=512:512,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5`;
+      // 1. Verificar tamanho do vídeo original
+      const originalWidth = await this._getVideoWidth(inputPath);
+      const isHeavyVideo = originalWidth > 860; // Consideramos "Pesado" se for maior que 860px (perto de 720p/1080p)
+
+      // 2. Definir parâmetros dinâmicos
+      let fps, ditherScale, webpQuality;
+
+      if (isHeavyVideo) {
+        // --- MODO PESADO (Para vídeos Full HD/4K) ---
+        console.log(`Vídeo Pesado (${originalWidth}px). Aplicando compressão agressiva.`);
+        fps = 6;              // FPS baixo para economizar
+        ditherScale = 2;      // Dither forte (pontilhado) para reduzir cores
+        webpQuality = 20;     // Qualidade baixa
+      } else {
+        // --- MODO PADRÃO (Para vídeos de Zap/Baixa Resolução) ---
+        fps = 9;              // FPS mais fluido
+        ditherScale = 5;      // Dither suave
+        webpQuality = 30;     // Qualidade visualmente agradável
+      }
+
+      // 3. FFmpeg: Gera GIF
+      // scale=512:512 (Estica 1:1)
+      const videoFilter = `fps=${fps},scale=512:512,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse=dither=bayer:bayer_scale=${ditherScale}`;
 
       const command = `ffmpeg -y -ss ${startTime} -t ${duration} -i "${inputPath}" ` +
         `-vf "${videoFilter}" ` +
@@ -100,12 +132,10 @@ class Ffmpeg {
 
       await this._executeCommand(command);
 
-      // 2. Sharp: Converte GIF -> WebP (Equilíbrio Visual)
-      // quality: 40 -> Visualmente "Adequado" (não é HD, mas não é borrão)
-      // effort: 0   -> Velocidade máxima para não travar o bot
+      // 4. Sharp: Converte GIF -> WebP (Com os parâmetros escolhidos)
       await sharp(gifTempPath, { animated: true })
         .webp({
-          quality: 20,
+          quality: webpQuality,
           effort: 0, 
           loop: 0
         })
@@ -122,13 +152,12 @@ class Ffmpeg {
   }
 
   // ===========================================================================
-  // OUTROS MÉTODOS
+  // OUTROS MÉTODOS (TOGIF, MP3, ETC)
   // ===========================================================================
 
   async convertStickerToGif(inputPath) {
     const gifTempPath = await this._createTempFilePath("gif");
     const mp4OutputPath = await this._createTempFilePath("mp4");
-
     try {
       await sharp(inputPath, { animated: true }).toFormat("gif").toFile(gifTempPath);
       const command = `ffmpeg -y -i "${gifTempPath}" -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset fast -crf 26 -pix_fmt yuv420p -movflags faststart "${mp4OutputPath}"`;
@@ -146,35 +175,31 @@ class Ffmpeg {
     return outputPath;
   }
 
-  // Métodos auxiliares de imagem (Blur, Grayscale, etc)
+  // Filtros de imagem mantidos...
   async applyBlur(inputPath, intensity = "7:5") {
     const outputPath = await this._createTempFilePath();
     const command = `ffmpeg -i ${inputPath} -vf boxblur=${intensity} ${outputPath}`;
     await this._executeCommand(command);
     return outputPath;
   }
-
   async convertToGrayscale(inputPath) {
     const outputPath = await this._createTempFilePath();
     const command = `ffmpeg -i ${inputPath} -vf format=gray ${outputPath}`;
     await this._executeCommand(command);
     return outputPath;
   }
-
   async mirrorImage(inputPath) {
     const outputPath = await this._createTempFilePath();
     const command = `ffmpeg -i ${inputPath} -vf hflip ${outputPath}`;
     await this._executeCommand(command);
     return outputPath;
   }
-
   async adjustContrast(inputPath, contrast = 1.2) {
     const outputPath = await this._createTempFilePath();
     const command = `ffmpeg -i ${inputPath} -vf eq=contrast=${contrast} ${outputPath}`;
     await this._executeCommand(command);
     return outputPath;
   }
-
   async applyPixelation(inputPath) {
     const outputPath = await this._createTempFilePath();
     const command = `ffmpeg -i ${inputPath} -vf 'scale=iw/6:ih/6, scale=iw*10:ih*10:flags=neighbor' ${outputPath}`;
